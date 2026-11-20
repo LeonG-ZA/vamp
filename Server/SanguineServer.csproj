@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Standalone dedicated server. Shares the exact simulation code used by the Unity client's Host mode. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>SanguineServer</AssemblyName>
+    <RootNamespace>Sanguine.DedicatedServer</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Assets/Sanguine/Scripts/Core/**/*.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>
