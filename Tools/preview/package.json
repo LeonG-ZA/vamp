@@ -1,0 +1,8 @@
+{
+  "name": "sanguine-city-preview",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Browser preview renderer for Sanguine City (three.js + headless Chromium).",
+  "type": "module",
+  "dependencies": { "three": "0.160.0" }
+}

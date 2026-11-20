@@ -11,7 +11,8 @@ Shader "Sanguine/Sky"
         _NightExposure ("Night exposure", Float) = 1
         _DayExposure ("Day exposure", Float) = 1
         _Rotation ("Rotation (degrees)", Range(0, 360)) = 0
-        _HorizonGlow ("City glow", Color) = (0.32, 0.17, 0.09, 1)
+        _HorizonGlow ("City glow", Color) = (0.06, 0.035, 0.02, 1)
+        _Clamp ("Max radiance (keeps moon/sun out of ambient)", Float) = 40
         _HorizonFog ("Fade into fog at horizon", Range(0, 1)) = 0.85
     }
     SubShader
@@ -29,7 +30,7 @@ Shader "Sanguine/Sky"
 
             sampler2D _NightTex, _DayTex;
             half4 _NightTex_HDR, _DayTex_HDR;
-            half _DayBlend, _NightExposure, _DayExposure, _HorizonFog;
+            half _DayBlend, _NightExposure, _DayExposure, _HorizonFog, _Clamp;
             float _Rotation;
             half4 _HorizonGlow;
 
@@ -71,7 +72,9 @@ Shader "Sanguine/Sky"
             half3 SampleHdr(sampler2D tex, half4 decode, float2 uv)
             {
                 half4 c = tex2Dlod(tex, float4(uv, 0, 0));
-                return decode.x > 0 ? DecodeHDR(c, decode) : c.rgb;
+                // Poly Haven skies are exposure-normalised with an extremely bright moon/sun disc;
+                // clamp it so the explicit moon/sun light, not the sky, provides the direct light.
+                return min(decode.x > 0 ? DecodeHDR(c, decode) : c.rgb, _Clamp);
             }
 
             half4 frag(v2f i) : SV_Target

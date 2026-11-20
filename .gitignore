@@ -28,3 +28,10 @@
 # Asset build tool caches
 /Tools/assets/.cache/
 /Tools/assets/node_modules/
+
+# Preview tool outputs
+/Tools/preview/node_modules/
+/Tools/preview/bin/
+/Tools/preview/scene.json
+/Tools/preview/params.js
+/Tools/preview/*.png

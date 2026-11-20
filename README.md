@@ -6,7 +6,7 @@ mechanic, feeding on humans and ghoul-style minion missions. The setting and rul
 
 ![Sanguine City preview](Docs/screenshot-preview.png)
 
-*Preview: the game state (Selene feeding on a DJ in Midtown with a hunter closing in) is a live capture from the real server. The image is a browser re-creation of the Unity client's scene and HUD, not a Unity render, so lighting is approximate.*
+*Preview: Selene feeds on a cab driver outside a Midtown club. Fleeing witnesses have pushed her exposure to 84%, so she's MARKED, and a hunter has picked up her trail. The game state and the city layout come from the real server and the shared `CityDressing` code, and the image uses the game's own art. It is a browser re-creation (three.js), not a Unity render, so lighting is approximate. Characters are shown with the built-in fallback figure (see [Characters](#characters)).*
 
 - **[Docs/RESEARCH.md](Docs/RESEARCH.md)**: what design material exists for the cancelled game, what it says, and sources.
 - **[Docs/DESIGN.md](Docs/DESIGN.md)**: the game design document for Sanguine City.
@@ -22,11 +22,23 @@ mechanic, feeding on humans and ghoul-style minion missions. The setting and rul
 - **Circles** (player factions), **thrall missions** that win **district control**, a nightly **Regent election**,
   **edicts** and **blood hunts**.
 - **Authoritative server** with persistence (characters, circles, influence, regent).
-- **Zero assets:** the city, characters and UI are generated at runtime, so you can open the project and press Play.
+- **Realistic CC0 art:**
+  - photoscanned PBR textures for roads, sidewalks and walls;
+  - building facades with lit-window emission maps;
+  - 20 Poly Haven street props (lampposts, parked cars, hydrants, trash cans, roller shutters, fire escapes, aircon units, fire barrels, harbour freight);
+  - HDR night and day skies.
+  All of it is listed in [CREDITS.md](CREDITS.md).
+- **Night-city rendering:**
+  - deferred HDR camera with about 390 real lights; the nearest lamps cast shadows;
+  - wet streets with realtime reflections;
+  - bloom, ambient occlusion, screen-space reflections and ACES grading.
+- **Still runs without any art:** if the art or packages are missing, the game falls back to flat colours and simple shapes. Open the project and press Play.
 
 ## Quick start (Unity)
 
-1. Open this folder with **Unity 6 (6000.0 LTS)** or Unity 2022.3 LTS or later, using the Built-in render pipeline. URP also works.
+1. Open this folder with **Unity 6 (6000.0 LTS)** or Unity 2022.3.67+, using the Built-in render pipeline.
+   - The Package Manager installs **glTFast** (it imports the props) and **Post Processing**.
+   - On first load, the project switches itself to Linear colour space.
 2. Open any scene (an empty one is fine) and press **Play**. Alternatively, run **Sanguine ▸ Create Main Scene** first.
 3. Enter a name and password, pick a bloodline, and click **Host & Play**.
    - This starts the embedded server on port 7777 and joins it.
@@ -36,6 +48,39 @@ mechanic, feeding on humans and ghoul-style minion missions. The setting and rul
 Make builds from **Sanguine ▸ Build ▸ …**:
 - Windows, macOS and Linux clients.
 - A Linux **Dedicated Server**. Run it with `-server -batchmode -nographics --port 7777`.
+
+## Art pipeline
+
+All third-party art is CC0. It comes from [Poly Haven](https://polyhaven.com) and [ambientCG](https://ambientcg.com) and is generated reproducibly:
+
+```bash
+cd Tools/assets && npm install && cd ../..
+python3 Tools/assets/build_assets.py      # downloads, converts and writes Assets/Sanguine/Resources
+```
+
+The script:
+- packs the PBR maps the way Unity's Standard shader expects them;
+- splits, recentres and simplifies the props, then writes them as GLB;
+- generates `PropCatalog.g.cs` and `CREDITS.md`.
+
+`CityDressing` (shared, engine-free code) decides every building's facade and where each lamp, car, door, fire escape and light goes. The Unity client and the preview tool therefore build the same city.
+
+## Characters
+
+Characters are data-driven:
+- Drop rigged human models into `Assets/Sanguine/Resources/Characters/{Vampires,Mortals,Hunters,Any}/`.
+- Drop animation clips (Idle, Walk, Run, optionally Feed/Bite and Death) into `Assets/Sanguine/Resources/Animations/`.
+
+The importer sets them up as Humanoid, so any humanoid rig works, for example Mixamo, Microsoft Rocketbox or MakeHuman exports. They are animated with the Playables API, so no animator controller is needed. Without such assets, an articulated fallback figure with a procedural walk and run cycle is used.
+
+The repository doesn't ship realistic human models yet. None of the CC0 sources used here have any, and licensed sources need your decision, so check the license before committing characters to a public repository. Mixamo assets, for example, can be used in your game but not redistributed as files.
+
+## Preview screenshots without Unity
+
+`Tools/preview/make_preview.sh` produces a screenshot like the one above. It:
+1. runs the real server and scripts a short scene with bot players;
+2. exports the live state and the full `CityDressing`;
+3. renders that with three.js in headless Chromium, using the same art.
 
 ## Controls
 
@@ -96,6 +141,9 @@ Assets/Sanguine/Scripts/Client/    Sanguine.Client asmdef: Bootstrap, GameClient
 Assets/Sanguine/Scripts/Editor/    Menu items: create scene, build clients / dedicated server
 Server/                            Standalone dedicated server (csproj + Mono build script) and integration test
 Docs/                              Research notes and the design document
+Tools/assets/                      CC0 art download + conversion pipeline (Python + glTF-Transform)
+Tools/preview/                     Live-server scene export + three.js preview renderer
+Assets/Sanguine/Resources/         Generated art: Textures/, Props/ (GLB), Sky/ (HDR), templates, sky shader
 ```
 
 ## Notes and limitations

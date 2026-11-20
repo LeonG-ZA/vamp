@@ -22,7 +22,7 @@ namespace Sanguine.Client
 
         private static readonly Color NightFog = new Color(0.045f, 0.05f, 0.075f);
         private static readonly Color DayFog = new Color(0.55f, 0.58f, 0.62f);
-        private static readonly Color NightAmbient = new Color(0.07f, 0.075f, 0.11f);
+        private static readonly Color NightAmbient = new Color(0.13f, 0.14f, 0.19f);
         private static readonly Color DayAmbient = new Color(0.5f, 0.52f, 0.55f);
 
         private void Start()
@@ -47,14 +47,15 @@ namespace Sanguine.Client
                 _sky.SetTexture("_DayTex", day != null ? day : night);
                 _sky.SetFloat("_Rotation", SkyRotation);
                 RenderSettings.skybox = _sky;
-                RenderSettings.ambientMode = AmbientMode.Skybox;
                 if (ArtLibrary.Sky != null) _moonDir = ArtLibrary.SkyDirection(ArtLibrary.Sky.moonU, ArtLibrary.Sky.moonV, SkyRotation);
             }
             else
             {
                 RenderSettings.skybox = null;
-                RenderSettings.ambientMode = AmbientMode.Flat;
             }
+            // Ambient fill: scattered city light from above, warmer at street level, dark below.
+            // (The HDR sky still provides the background and reflections.)
+            RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
@@ -108,9 +109,11 @@ namespace Sanguine.Client
             if (_sky != null)
             {
                 _sky.SetFloat("_DayBlend", d);
-                _sky.SetFloat("_NightExposure", 0.55f);
+                // The night HDR is exposure-normalised (its sky is nearly as bright as the day sky's),
+                // so it is scaled down hard to read as night.
+                _sky.SetFloat("_NightExposure", 0.06f);
                 _sky.SetFloat("_DayExposure", 1.0f);
-                RenderSettings.ambientIntensity = Mathf.Lerp(0.85f, 1.0f, d);
+                _sky.SetFloat("_Clamp", 40f);
                 if (Mathf.Abs(d - _lastGiAmount) > 0.02f)
                 {
                     _lastGiAmount = d;
@@ -118,9 +121,12 @@ namespace Sanguine.Client
                 }
                 if (cam != null) cam.clearFlags = CameraClearFlags.Skybox;
             }
-            else
+            RenderSettings.ambientSkyColor = Color.Lerp(NightAmbient, DayAmbient, d);
+            RenderSettings.ambientEquatorColor = Color.Lerp(new Color(0.12f, 0.105f, 0.095f), new Color(0.45f, 0.44f, 0.42f), d);
+            RenderSettings.ambientGroundColor = Color.Lerp(new Color(0.045f, 0.04f, 0.038f), new Color(0.22f, 0.21f, 0.2f), d);
+            RenderSettings.ambientLight = RenderSettings.ambientSkyColor;
+            if (_sky == null)
             {
-                RenderSettings.ambientLight = Color.Lerp(NightAmbient, DayAmbient, d);
                 if (cam != null)
                 {
                     cam.clearFlags = CameraClearFlags.SolidColor;

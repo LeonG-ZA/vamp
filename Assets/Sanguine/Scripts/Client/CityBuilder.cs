@@ -203,6 +203,11 @@ namespace Sanguine.Client
 
             float size = info != null ? Mathf.Max(info.Width * p.ScaleX, info.Height * p.ScaleY, info.Depth * p.ScaleZ) : 1f;
             Renderer[] renderers = go.GetComponentsInChildren<Renderer>();
+            if (info != null && info.LightCount > 0)
+            {
+                // The light sits inside the lantern; its glass and frame must not shadow it.
+                foreach (Renderer r in renderers) r.shadowCastingMode = ShadowCastingMode.Off;
+            }
             if (renderers.Length > 0)
             {
                 // Cull small props once they shrink to a few pixels.

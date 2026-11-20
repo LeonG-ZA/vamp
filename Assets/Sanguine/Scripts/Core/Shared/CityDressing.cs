@@ -510,8 +510,9 @@ namespace Sanguine
                 float w = b.Style == BuildingStyle.Tower ? width * 0.45f : _rng.Range(2.2f, 3.6f);
                 float hgt = b.Style == BuildingStyle.Tower ? 3.4f : 2.0f;
                 PointOnFace(fx, fz, yaw, _rng.Range(-width * 0.25f, width * 0.25f), 0.02f, out x, out z);
-                AddBox(SurfaceNames.Glow, x, d.BaseY + 0.7f + hgt * 0.5f, z, w, hgt, 0.04f, yaw,
-                       warm ? 1f : 0.75f, warm ? 0.78f : 0.88f, warm ? 0.5f : 1f, b.Style == BuildingStyle.Tower ? 1.6f : 1.2f);
+                // Lit shop window / lobby glazing, textured with real lit-window imagery.
+                AddBox(SurfaceNames.OfficeBlock, x, d.BaseY + 0.7f + hgt * 0.5f, z, w, hgt, 0.04f, yaw,
+                       warm ? 1f : 0.85f, warm ? 0.92f : 0.92f, warm ? 0.85f : 1f, b.Style == BuildingStyle.Tower ? 1.1f : 0.9f);
             }
 
             // Club neon.
@@ -519,10 +520,11 @@ namespace Sanguine
             {
                 float[] c = NeonPalette[_rng.Range(0, NeonPalette.Length)];
                 PointOnFace(fx, fz, yaw, _rng.Range(-width * 0.2f, width * 0.2f), 0.18f, out x, out z);
-                AddBox(SurfaceNames.Glow, x, d.BaseY + d.BandHeight - 0.75f, z, Math.Min(width * 0.55f, 7f), 0.42f, 0.12f, yaw, c[0], c[1], c[2], 5f);
-                float lx, lz;
-                PointOnFace(fx, fz, yaw, 0f, 1.4f, out lx, out lz);
-                AddLight(LightKind.Neon, x + (lx - fx) * 0.5f, d.BaseY + d.BandHeight - 0.9f, z + (lz - fz) * 0.5f, c[0], c[1], c[2], 10f, 2.4f);
+                AddBox(SurfaceNames.Glow, x, d.BaseY + d.BandHeight - 0.75f, z, Math.Min(width * 0.4f, 4.5f), 0.32f, 0.1f, yaw, c[0], c[1], c[2], 3.2f);
+                // Neon light spills onto the sidewalk from a little in front of the sign.
+                float ox, oz;
+                Rotate(yaw, 0f, 1.8f, out ox, out oz);
+                AddLight(LightKind.Neon, x + ox, d.BaseY + d.BandHeight - 1.2f, z + oz, c[0], c[1], c[2], 10f, 1.6f);
             }
 
             // Air conditioners on upper floors.
@@ -611,7 +613,7 @@ namespace Sanguine
         private void AddStreetLamp(float x, float z, float yaw)
         {
             if (!InsideMap(x, z) || _city.ZoneAt(x, z) != null) return;
-            AddLitProp("street_lamp", x, CurbHeight, z, yaw, LightKind.Lamp, 1f, 0.7f, 0.42f, 15f, 2.3f);
+            AddLitProp("street_lamp", x, CurbHeight, z, yaw, LightKind.Lamp, 1f, 0.7f, 0.42f, 19f, 3f);
         }
 
         private void BuildStreetFurniture()

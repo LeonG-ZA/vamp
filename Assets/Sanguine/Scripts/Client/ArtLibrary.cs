@@ -48,6 +48,9 @@ namespace Sanguine.Client
         /// <summary>Rain-slicked streets: roads are glossier than their dry scans.</summary>
         public const float WetStreetGloss = 2.4f;
 
+        /// <summary>HDR multiplier for lit windows in facade emission maps.</summary>
+        public const float FacadeGlow = 0.5f;
+
         public static SkyEntry Sky { get; private set; }
 
         public static void Load()
@@ -112,7 +115,7 @@ namespace Sanguine.Client
             {
                 float gloss = e.gloss;
                 if (name == SurfaceNames.Asphalt || name == SurfaceNames.Cobblestone) gloss *= WetStreetGloss;
-                float glowIntensity = glow != null ? (emission > 0f ? emission : 1.35f) : 0f;
+                float glowIntensity = glow != null ? (emission > 0f ? emission : FacadeGlow) : 0f;
                 m = Mats.Pbr("pbr:" + key, albedo, normal, mask, glow, tint, gloss, glowIntensity);
             }
             Materials[key] = m;
