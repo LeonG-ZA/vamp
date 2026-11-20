@@ -4,6 +4,10 @@ An online vampire sandbox built in **Unity**. It draws on what is publicly known
 cancelled *World of Darkness* MMO (2006–2014): a politics-first sandbox with open PvP, a secrecy
 mechanic, feeding on humans and ghoul-style minion missions. The setting and rules are original.
 
+![Sanguine City preview](Docs/screenshot-preview.png)
+
+*Preview: the game state (Selene feeding on a DJ in Midtown with a hunter closing in) is a live capture from the real server. The image is a browser re-creation of the Unity client's scene and HUD, not a Unity render, so lighting is approximate.*
+
 - **[Docs/RESEARCH.md](Docs/RESEARCH.md)**: what design material exists for the cancelled game, what it says, and sources.
 - **[Docs/DESIGN.md](Docs/DESIGN.md)**: the game design document for Sanguine City.
 
