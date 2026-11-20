@@ -10,7 +10,7 @@ namespace Sanguine.Client
         public Camera Cam;
 
         private CharacterController _cc;
-        private Transform _body;
+        private CharacterVisual _visual;
         private float _yaw, _pitch = 18f, _distance = 7f;
         private float _verticalVelocity;
         private float _nextSend;
@@ -30,9 +30,7 @@ namespace Sanguine.Client
             lp._cc.center = new Vector3(0, 1f, 0);
             lp._cc.stepOffset = 0.4f;
 
-            Renderer r;
-            Color coat = Color.Lerp(Mats.BloodlineColor(bloodline), Color.black, 0.45f);
-            lp._body = EntityView.BuildAvatar(go.transform, coat, new Color(0.93f, 0.9f, 0.92f), out r);
+            lp._visual = CharacterVisual.Create(go.transform, CharacterRole.Vampire, client.MyId, bloodline);
 
             Camera cam = Camera.main;
             if (cam == null)
@@ -42,9 +40,8 @@ namespace Sanguine.Client
                 cam = camGo.AddComponent<Camera>();
                 camGo.AddComponent<AudioListener>();
             }
-            cam.nearClipPlane = 0.2f;
-            cam.farClipPlane = 600f;
             cam.fieldOfView = 60f;
+            PostFx.Setup(cam);
             lp.Cam = cam;
             return lp;
         }
@@ -104,10 +101,10 @@ namespace Sanguine.Client
             move.y = _verticalVelocity;
             _cc.Move(move * Time.deltaTime);
 
-            // Torpor pose.
-            Quaternion pose = (f & SelfFlags.Torpor) != 0 ? Quaternion.Euler(-90, 0, 0) : ((f & SelfFlags.Feeding) != 0 ? Quaternion.Euler(18, 0, 0) : Quaternion.identity);
-            _body.localRotation = Quaternion.Slerp(_body.localRotation, pose, 1f - Mathf.Exp(-10f * Time.deltaTime));
-            _body.localPosition = (f & SelfFlags.Torpor) != 0 ? new Vector3(0, 0.35f, 0) : Vector3.zero;
+            // Animation from the actual ground speed.
+            Vector3 v = _cc.velocity;
+            v.y = 0f;
+            _visual.SetMotion(v.magnitude, (f & SelfFlags.Feeding) != 0, (f & SelfFlags.Torpor) != 0);
 
             // --- Network ------------------------------------------------------
             if (Time.time >= _nextSend)

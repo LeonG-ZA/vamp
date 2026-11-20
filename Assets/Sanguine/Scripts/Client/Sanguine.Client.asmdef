@@ -1,7 +1,10 @@
 {
     "name": "Sanguine.Client",
     "rootNamespace": "Sanguine.Client",
-    "references": [ "Sanguine.Core" ],
+    "references": [
+        "Sanguine.Core",
+        "Unity.Postprocessing.Runtime"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
@@ -9,6 +12,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.postprocessing",
+            "expression": "3.0.0",
+            "define": "SANGUINE_PPV2"
+        }
+    ],
     "noEngineReferences": false
 }

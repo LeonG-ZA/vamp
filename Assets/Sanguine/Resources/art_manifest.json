@@ -1,0 +1,566 @@
+{
+ "version": 1,
+ "textures": [
+  {
+   "name": "asphalt_02",
+   "tile": 3.0,
+   "emission": false,
+   "gloss": 1.15,
+   "use": "roads"
+  },
+  {
+   "name": "concrete_pavement",
+   "tile": 1.8,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "sidewalks"
+  },
+  {
+   "name": "cobblestone_floor_08",
+   "tile": 2.0,
+   "emission": false,
+   "gloss": 1.1,
+   "use": "Old Quarter roads"
+  },
+  {
+   "name": "square_cobblestone",
+   "tile": 2.0,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "Old Quarter sidewalks"
+  },
+  {
+   "name": "herringbone_pavement_03",
+   "tile": 2.4,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "haven plazas"
+  },
+  {
+   "name": "floor_pavement",
+   "tile": 2.0,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "sanctum plazas"
+  },
+  {
+   "name": "leafy_grass",
+   "tile": 2.0,
+   "emission": false,
+   "gloss": 0.8,
+   "use": "parks"
+  },
+  {
+   "name": "tarred_gravel",
+   "tile": 2.2,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "roofs"
+  },
+  {
+   "name": "corrugated_iron",
+   "tile": 1.12,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "warehouses"
+  },
+  {
+   "name": "rusty_corrugated_iron",
+   "tile": 2.0,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "warehouses"
+  },
+  {
+   "name": "factory_brick",
+   "tile": 1.5,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "warehouses"
+  },
+  {
+   "name": "container_side",
+   "tile": 1.94,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "shipping containers"
+  },
+  {
+   "name": "large_sandstone_blocks_01",
+   "tile": 3.0,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "crypts, sanctums"
+  },
+  {
+   "name": "dark_brick_wall",
+   "tile": 1.05,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "Midtown ground floors, clubs"
+  },
+  {
+   "name": "medieval_red_brick",
+   "tile": 2.0,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "Old Quarter ground floors"
+  },
+  {
+   "name": "concrete_wall_004",
+   "tile": 2.0,
+   "emission": false,
+   "gloss": 1.0,
+   "use": "Financial Row ground floors, curbs"
+  },
+  {
+   "name": "Facade018B",
+   "tile": 18.0,
+   "emission": true,
+   "gloss": 1.0,
+   "use": "brick apartments (lit windows)"
+  },
+  {
+   "name": "Facade019B",
+   "tile": 18.0,
+   "emission": true,
+   "gloss": 1.0,
+   "use": "modern offices (lit windows)"
+  },
+  {
+   "name": "Facade020B",
+   "tile": 18.0,
+   "emission": true,
+   "gloss": 1.0,
+   "use": "brick tower (lit windows)"
+  },
+  {
+   "name": "Facade017",
+   "tile": 42.0,
+   "emission": true,
+   "gloss": 1.0,
+   "use": "concrete office block (lit windows)"
+  },
+  {
+   "name": "Facade013",
+   "tile": 110.0,
+   "emission": true,
+   "gloss": 1.0,
+   "use": "skyscraper (lit windows)"
+  },
+  {
+   "name": "Facade014",
+   "tile": 110.0,
+   "emission": true,
+   "gloss": 1.0,
+   "use": "skyscraper (sparse lit windows)"
+  },
+  {
+   "name": "Facade016",
+   "tile": 110.0,
+   "emission": true,
+   "gloss": 1.0,
+   "use": "skyscraper (dark, lit windows)"
+  }
+ ],
+ "props": [
+  {
+   "id": "street_lamp",
+   "source": "street_lamp_01",
+   "file": "Props/street_lamp",
+   "tris": 9339,
+   "bytes": 942244,
+   "min": [
+    -0.352,
+    0,
+    -0.193
+   ],
+   "max": [
+    0.352,
+    3.871,
+    0.193
+   ],
+   "pivot": "below",
+   "lights": [
+    {
+     "x": 0,
+     "y": 3.264,
+     "z": 0
+    }
+   ]
+  },
+  {
+   "id": "fire_hydrant",
+   "source": "fire_hydrant",
+   "file": "Props/fire_hydrant",
+   "tris": 11983,
+   "bytes": 543620,
+   "min": [
+    -0.137,
+    0,
+    -0.159
+   ],
+   "max": [
+    0.137,
+    0.799,
+    0.159
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "trash_can",
+   "source": "metal_trash_can",
+   "file": "Props/trash_can",
+   "tris": 4812,
+   "bytes": 381560,
+   "min": [
+    -0.389,
+    0,
+    -0.278
+   ],
+   "max": [
+    0.389,
+    0.906,
+    0.278
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "trash_can_rusty",
+   "source": "metal_trash_can",
+   "file": "Props/trash_can_rusty",
+   "tris": 5499,
+   "bytes": 441728,
+   "min": [
+    -0.387,
+    0,
+    -0.274
+   ],
+   "max": [
+    0.387,
+    0.906,
+    0.275
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "covered_car",
+   "source": "covered_car",
+   "file": "Props/covered_car",
+   "tris": 10985,
+   "bytes": 1003896,
+   "min": [
+    -0.894,
+    0,
+    -2.19
+   ],
+   "max": [
+    0.894,
+    1.411,
+    2.19
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "road_barrier",
+   "source": "concrete_road_barrier_02",
+   "file": "Props/road_barrier",
+   "tris": 11910,
+   "bytes": 505676,
+   "min": [
+    -0.783,
+    0,
+    -0.221
+   ],
+   "max": [
+    0.783,
+    1.112,
+    0.221
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "aircon",
+   "source": "exterior_aircon_unit",
+   "file": "Props/aircon",
+   "tris": 3947,
+   "bytes": 920076,
+   "min": [
+    -0.399,
+    0,
+    0
+   ],
+   "max": [
+    0.4,
+    0.928,
+    0.374
+   ],
+   "pivot": "wall",
+   "lights": []
+  },
+  {
+   "id": "security_light",
+   "source": "security_light",
+   "file": "Props/security_light",
+   "tris": 4256,
+   "bytes": 923320,
+   "min": [
+    -0.162,
+    0,
+    0
+   ],
+   "max": [
+    0.162,
+    0.531,
+    0.417
+   ],
+   "pivot": "wall",
+   "lights": [
+    {
+     "x": 0.001,
+     "y": 0.198,
+     "z": 0.254
+    }
+   ]
+  },
+  {
+   "id": "utility_box",
+   "source": "utility_box_01",
+   "file": "Props/utility_box",
+   "tris": 4404,
+   "bytes": 327840,
+   "min": [
+    -0.26,
+    0,
+    -0.216
+   ],
+   "max": [
+    0.26,
+    1.12,
+    0.216
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "trash_bag",
+   "source": "trashbag",
+   "file": "Props/trash_bag",
+   "tris": 4056,
+   "bytes": 314292,
+   "min": [
+    -0.264,
+    0,
+    -0.231
+   ],
+   "max": [
+    0.264,
+    0.575,
+    0.231
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "fire_barrel",
+   "source": "barrel_stove",
+   "file": "Props/fire_barrel",
+   "tris": 6534,
+   "bytes": 377016,
+   "min": [
+    -0.296,
+    0,
+    -0.296
+   ],
+   "max": [
+    0.296,
+    0.856,
+    0.296
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "shutter_door",
+   "source": "rollershutter_door",
+   "file": "Props/shutter_door",
+   "tris": 552,
+   "bytes": 187752,
+   "min": [
+    -0.54,
+    0,
+    0
+   ],
+   "max": [
+    0.54,
+    2.4,
+    0.3
+   ],
+   "pivot": "wall",
+   "lights": []
+  },
+  {
+   "id": "shutter_door_graffiti",
+   "source": "rollershutter_door",
+   "file": "Props/shutter_door_graffiti",
+   "tris": 552,
+   "bytes": 203308,
+   "min": [
+    -0.54,
+    0,
+    0
+   ],
+   "max": [
+    0.54,
+    2.4,
+    0.3
+   ],
+   "pivot": "wall",
+   "lights": []
+  },
+  {
+   "id": "fire_escape",
+   "source": "modular_fire_escape",
+   "file": "Props/fire_escape",
+   "tris": 11322,
+   "bytes": 1895208,
+   "min": [
+    -3.331,
+    0,
+    0
+   ],
+   "max": [
+    3.331,
+    9.757,
+    1.421
+   ],
+   "pivot": "wall",
+   "lights": []
+  },
+  {
+   "id": "bench",
+   "source": "painted_wooden_bench",
+   "file": "Props/bench",
+   "tris": 630,
+   "bytes": 194028,
+   "min": [
+    -0.582,
+    0,
+    -0.248
+   ],
+   "max": [
+    0.582,
+    0.889,
+    0.248
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "crate",
+   "source": "wooden_crate_01",
+   "file": "Props/crate",
+   "tris": 3222,
+   "bytes": 302692,
+   "min": [
+    -0.412,
+    0,
+    -0.204
+   ],
+   "max": [
+    0.412,
+    0.349,
+    0.203
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "barrel",
+   "source": "Barrel_01",
+   "file": "Props/barrel",
+   "tris": 2682,
+   "bytes": 319872,
+   "min": [
+    -0.282,
+    0,
+    -0.282
+   ],
+   "max": [
+    0.282,
+    0.88,
+    0.282
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "cardboard_box",
+   "source": "cardboard_box_01",
+   "file": "Props/cardboard_box",
+   "tris": 5932,
+   "bytes": 325020,
+   "min": [
+    -0.193,
+    0,
+    -0.258
+   ],
+   "max": [
+    0.193,
+    0.342,
+    0.258
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "manhole",
+   "source": "water_manhole_cover",
+   "file": "Props/manhole",
+   "tris": 1590,
+   "bytes": 309752,
+   "min": [
+    -0.345,
+    0,
+    -0.345
+   ],
+   "max": [
+    0.345,
+    0.068,
+    0.345
+   ],
+   "pivot": "below",
+   "lights": []
+  },
+  {
+   "id": "planter",
+   "source": "planter_box_01",
+   "file": "Props/planter",
+   "tris": 4046,
+   "bytes": 361892,
+   "min": [
+    -0.456,
+    0,
+    -0.207
+   ],
+   "max": [
+    0.456,
+    0.425,
+    0.207
+   ],
+   "pivot": "below",
+   "lights": []
+  }
+ ],
+ "sky": {
+  "night": "Sky/night_sky",
+  "moonU": 0.5908,
+  "moonV": 0.8457,
+  "day": "Sky/day_sky"
+ }
+}

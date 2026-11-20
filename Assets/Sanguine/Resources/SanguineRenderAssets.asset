@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88a4ead6ff444d118a894bcfbdad4930, type: 3}
+  m_Name: SanguineRenderAssets
+  m_EditorClassIdentifier: 
+  plainTemplate: {fileID: 2100000, guid: 972944b9b29a405fb4cf534f4ee5c759, type: 2}
+  emissiveTemplate: {fileID: 2100000, guid: 3373da2a04cc4bccb49aaa4b676a0f8c, type: 2}
+  pbrTemplate: {fileID: 2100000, guid: 95ab347d84c3456f8a546a7a73bd65e4, type: 2}
+  pbrEmissiveTemplate: {fileID: 2100000, guid: d5a8d1f8eb3443fda0521395ab1f6bbc, type: 2}
+  skyShader: {fileID: 4800000, guid: 83ca0d9b5d3c4ab1a7dc1b7f2ce8929e, type: 3}
+  postProcessResources: {fileID: 11400000, guid: d82512f9c8e5d4a4d938b575d47f88d4, type: 2}

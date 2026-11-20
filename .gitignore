@@ -24,3 +24,7 @@
 /Server/obj/
 /save/
 /Server/save/
+
+# Asset build tool caches
+/Tools/assets/.cache/
+/Tools/assets/node_modules/

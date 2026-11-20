@@ -3,7 +3,8 @@ using UnityEngine;
 namespace Sanguine.Client
 {
     /// <summary>Visual representation of a networked entity (another player, a mortal or a hunter).
-    /// Smoothly follows the latest server snapshot.</summary>
+    /// Smoothly follows the latest server snapshot, stands on the real ground (curbs included) and
+    /// animates from its movement speed.</summary>
     public sealed class EntityView : MonoBehaviour
     {
         public int Id;
@@ -15,83 +16,59 @@ namespace Sanguine.Client
 
         private Vector3 _targetPos;
         private float _targetRot;
-        private Transform _body;
+        private CharacterVisual _visual;
         private GameObject _crown, _markLight, _bloodPool;
-        private Renderer _bodyRenderer;
         private bool _hasPosition;
+        private Vector3 _lastPos;
+        private float _speed;
 
-        public static EntityView Create(int id, EntityKind kind, Transform parent)
+        public static EntityView Create(int id, EntityKind kind, Transform parent, EntityInfoMsg? info)
         {
             var go = new GameObject(kind + " #" + id);
             go.transform.SetParent(parent, false);
             var v = go.AddComponent<EntityView>();
             v.Id = id;
             v.Kind = kind;
+            if (info.HasValue) v.Info = info.Value;
             v.BuildVisual();
             return v;
         }
 
-        /// <summary>Builds a simple humanoid out of primitives. Also used for the local player.</summary>
-        public static Transform BuildAvatar(Transform parent, Color coat, Color skin, out Renderer bodyRenderer)
-        {
-            var body = new GameObject("Body").transform;
-            body.SetParent(parent, false);
-            GameObject torso = Mats.Prim(PrimitiveType.Capsule, body, new Vector3(0, 1f, 0), new Vector3(0.7f, 0.85f, 0.7f), coat, false);
-            bodyRenderer = torso.GetComponent<Renderer>();
-            Mats.Prim(PrimitiveType.Sphere, body, new Vector3(0, 1.95f, 0), new Vector3(0.42f, 0.46f, 0.42f), skin, false);
-            // Eyes so facing is readable.
-            Mats.Prim(PrimitiveType.Sphere, body, new Vector3(-0.09f, 2.0f, 0.18f), Vector3.one * 0.07f, new Color(0.9f, 0.1f, 0.1f), false, true);
-            Mats.Prim(PrimitiveType.Sphere, body, new Vector3(0.09f, 2.0f, 0.18f), Vector3.one * 0.07f, new Color(0.9f, 0.1f, 0.1f), false, true);
-            return body;
-        }
-
         private void BuildVisual()
         {
-            Color coat, skin = new Color(0.85f, 0.75f, 0.68f);
-            var rng = new Rng(Id * 31 + 7);
-            switch (Kind)
-            {
-                case EntityKind.Mortal:
-                    coat = Color.HSVToRGB(rng.NextFloat(), rng.Range(0.2f, 0.6f), rng.Range(0.3f, 0.7f));
-                    skin = Color.Lerp(new Color(0.95f, 0.8f, 0.7f), new Color(0.4f, 0.27f, 0.18f), rng.NextFloat());
-                    break;
-                case EntityKind.Hunter:
-                    coat = new Color(0.25f, 0.18f, 0.1f);
-                    break;
-                default:
-                    coat = new Color(0.12f, 0.12f, 0.14f);
-                    skin = new Color(0.93f, 0.9f, 0.92f);
-                    break;
-            }
+            CharacterRole role = Kind == EntityKind.Player ? CharacterRole.Vampire : (Kind == EntityKind.Hunter ? CharacterRole.Hunter : CharacterRole.Mortal);
+            _visual = CharacterVisual.Create(transform, role, Id, Info.Bloodline);
 
-            _body = BuildAvatar(transform, coat, skin, out _bodyRenderer);
-
-            if (Kind == EntityKind.Mortal)
+            if (Kind == EntityKind.Hunter && _visual.RightHand != null)
             {
-                // Mortal eyes are not glowing red.
-                foreach (Transform c in _body)
-                    if (c.localScale.x < 0.1f) c.GetComponent<Renderer>().sharedMaterial = Mats.Get(new Color(0.1f, 0.1f, 0.1f));
-            }
-
-            if (Kind == EntityKind.Hunter)
-            {
-                Mats.Prim(PrimitiveType.Cylinder, _body, new Vector3(0, 2.2f, 0), new Vector3(0.6f, 0.05f, 0.6f), new Color(0.1f, 0.08f, 0.05f), false);
-                Mats.Prim(PrimitiveType.Cylinder, _body, new Vector3(0, 2.35f, 0), new Vector3(0.35f, 0.15f, 0.35f), new Color(0.1f, 0.08f, 0.05f), false);
-                GameObject torch = Mats.Prim(PrimitiveType.Sphere, _body, new Vector3(0.45f, 1.6f, 0.3f), Vector3.one * 0.2f, new Color(1f, 0.55f, 0.15f), false, true);
-                Light l = torch.AddComponent<Light>();
-                l.type = LightType.Point;
-                l.color = new Color(1f, 0.55f, 0.2f);
-                l.range = 8f;
-                l.intensity = 2f;
+                // A flashlight sweeping the street.
+                var torch = new GameObject("Flashlight");
+                torch.transform.SetParent(_visual.RightHand, false);
+                torch.transform.localPosition = new Vector3(0f, -0.04f, 0.06f);
+                torch.transform.localRotation = Quaternion.Euler(-15f, 0f, 0f);
+                Mats.Prim(PrimitiveType.Cylinder, torch.transform, new Vector3(0f, 0f, 0.05f), new Vector3(0.045f, 0.09f, 0.045f), new Color(0.08f, 0.08f, 0.08f), false)
+                    .transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                var beam = new GameObject("Beam");
+                beam.transform.SetParent(transform, false);
+                beam.transform.localPosition = new Vector3(0.25f, 1.35f, 0.3f);
+                beam.transform.localRotation = Quaternion.Euler(14f, 0f, 0f);
+                Light l = beam.AddComponent<Light>();
+                l.type = LightType.Spot;
+                l.color = new Color(0.9f, 0.95f, 1f);
+                l.range = 20f;
+                l.spotAngle = 38f;
+                l.intensity = 4f;
+                l.shadows = LightShadows.None;
             }
 
             if (Kind == EntityKind.Player)
             {
-                _crown = Mats.Prim(PrimitiveType.Cylinder, _body, new Vector3(0, 2.3f, 0), new Vector3(0.38f, 0.08f, 0.38f), new Color(1f, 0.8f, 0.2f), false, true);
+                Transform head = _visual.Head != null ? _visual.Head : transform;
+                _crown = Mats.Prim(PrimitiveType.Cylinder, head, new Vector3(0, 0.16f, 0), new Vector3(0.24f, 0.035f, 0.24f), new Color(1f, 0.8f, 0.2f), false, true);
                 _crown.SetActive(false);
                 _markLight = new GameObject("Mark");
-                _markLight.transform.SetParent(_body, false);
-                _markLight.transform.localPosition = new Vector3(0, 3f, 0);
+                _markLight.transform.SetParent(transform, false);
+                _markLight.transform.localPosition = new Vector3(0, 2.6f, 0);
                 Light ml = _markLight.AddComponent<Light>();
                 ml.type = LightType.Point;
                 ml.color = Color.red;
@@ -100,27 +77,26 @@ namespace Sanguine.Client
                 _markLight.SetActive(false);
             }
 
-            _bloodPool = Mats.Prim(PrimitiveType.Cylinder, transform, new Vector3(0, 0.13f, 0), new Vector3(1.6f, 0.01f, 1.6f), new Color(0.3f, 0f, 0f), false);
+            _bloodPool = Mats.Prim(PrimitiveType.Cylinder, transform, new Vector3(0, 0.005f, -0.9f), new Vector3(1.4f, 0.004f, 1.1f), new Color(0.16f, 0f, 0f), false);
+            _bloodPool.GetComponent<Renderer>().sharedMaterial = Mats.Get(new Color(0.16f, 0f, 0f), false, 0.85f);
             _bloodPool.SetActive(false);
 
             // Trigger collider for mouse picking; triggers do not block the character controller.
             var cap = gameObject.AddComponent<CapsuleCollider>();
             cap.isTrigger = true;
-            cap.center = new Vector3(0, 1f, 0);
-            cap.height = 2.2f;
-            cap.radius = 0.5f;
+            cap.center = new Vector3(0, 0.95f, 0);
+            cap.height = 1.9f;
+            cap.radius = 0.45f;
         }
 
         public void ApplyInfo(EntityInfoMsg info)
         {
             Info = info;
-            if (Kind == EntityKind.Player && _bodyRenderer != null)
-                _bodyRenderer.sharedMaterial = Mats.Get(Color.Lerp(Mats.BloodlineColor(info.Bloodline), Color.black, 0.45f));
         }
 
         public void ApplyState(EntityState s, float now)
         {
-            _targetPos = new Vector3(s.X, 0.12f, s.Z);
+            _targetPos = new Vector3(s.X, CityDressing.GroundHeight(s.X, s.Z), s.Z);
             _targetRot = s.Rot;
             Flags = s.Flags;
             HealthPct = s.HealthPct / 255f;
@@ -130,25 +106,27 @@ namespace Sanguine.Client
                 _hasPosition = true;
                 transform.position = _targetPos;
                 transform.rotation = Quaternion.Euler(0, _targetRot, 0);
+                _lastPos = _targetPos;
             }
         }
 
         private void Update()
         {
             if (!_hasPosition) return;
-            float k = 1f - Mathf.Exp(-12f * Time.deltaTime);
+            float dt = Mathf.Max(Time.deltaTime, 1e-4f);
+            float k = 1f - Mathf.Exp(-12f * dt);
             if ((transform.position - _targetPos).sqrMagnitude > 100f) transform.position = _targetPos;
             else transform.position = Vector3.Lerp(transform.position, _targetPos, k);
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0, _targetRot, 0), k);
 
+            Vector3 delta = transform.position - _lastPos;
+            delta.y = 0f;
+            _lastPos = transform.position;
+            _speed = Mathf.Lerp(_speed, delta.magnitude / dt, 1f - Mathf.Exp(-8f * dt));
+
             bool down = (Flags & EntityFlags.Down) != 0;
-            bool feeding = (Flags & EntityFlags.Feeding) != 0;
-            Quaternion pose = Quaternion.identity;
-            Vector3 offset = Vector3.zero;
-            if (down) { pose = Quaternion.Euler(-90, 0, 0); offset = new Vector3(0, 0.35f, 0f); }
-            else if (feeding) pose = Quaternion.Euler(Kind == EntityKind.Player ? 18f : -12f, 0, 0);
-            _body.localRotation = Quaternion.Slerp(_body.localRotation, pose, k);
-            _body.localPosition = Vector3.Lerp(_body.localPosition, offset, k);
+            bool feeding = (Flags & EntityFlags.Feeding) != 0 && Kind == EntityKind.Player;
+            _visual.SetMotion(down ? 0f : _speed, feeding, down);
 
             _bloodPool.SetActive(down && Kind != EntityKind.Player);
             if (_crown != null) _crown.SetActive((Flags & EntityFlags.Regent) != 0);

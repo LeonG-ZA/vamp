@@ -188,7 +188,8 @@ namespace Sanguine
                         for (int lz = 0; lz < 2; lz++)
                         {
                             float lcx = cx - 10f + lx * 20f, lcz = cz - 10f + lz * 20f;
-                            float sx = rng.Range(14f, 18.5f), sz = rng.Range(14f, 18.5f);
+                            // Lots are 20 m; buildings leave at least 1.75 m of sidewalk to the curb.
+                            float sx = rng.Range(13f, 16.5f), sz = rng.Range(13f, 16.5f);
                             float h;
                             BuildingStyle style;
                             switch (district)

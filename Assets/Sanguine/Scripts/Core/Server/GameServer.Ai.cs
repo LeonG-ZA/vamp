@@ -62,8 +62,9 @@ namespace Sanguine.Server
         private void PlaceMortal(Mortal m)
         {
             int node = RandomNodeInDistrict(m.HomeDistrict);
-            m.OffsetX = RandF() * 6f - 3f;
-            m.OffsetZ = RandF() * 6f - 3f;
+            // Pedestrians walk on the sidewalks, clear of parked cars and curb-side furniture.
+            m.OffsetX = (RandF() < 0.5f ? -1f : 1f) * (6.1f + RandF() * 0.4f);
+            m.OffsetZ = (RandF() < 0.5f ? -1f : 1f) * (6.1f + RandF() * 0.4f);
             m.X = _city.Nodes[node].X + m.OffsetX;
             m.Z = _city.Nodes[node].Z + m.OffsetZ;
             m.Health = m.MaxHealth;

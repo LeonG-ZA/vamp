@@ -1,0 +1,14 @@
+{
+  "name": "sanguine-city-asset-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Converts CC0 Poly Haven props into game-ready GLB files for Sanguine City.",
+  "type": "module",
+  "dependencies": {
+    "@gltf-transform/core": "^4.0.0",
+    "@gltf-transform/extensions": "^4.0.0",
+    "@gltf-transform/functions": "^4.0.0",
+    "meshoptimizer": "^0.22.0",
+    "sharp": "^0.33.0"
+  }
+}

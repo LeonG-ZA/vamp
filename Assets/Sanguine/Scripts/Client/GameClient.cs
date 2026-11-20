@@ -70,10 +70,10 @@ namespace Sanguine.Client
                 camGo.tag = "MainCamera";
                 Camera cam = camGo.AddComponent<Camera>();
                 camGo.AddComponent<AudioListener>();
-                cam.transform.position = new Vector3(0, 60, -120);
-                cam.transform.rotation = Quaternion.Euler(20, 0, 0);
-                cam.farClipPlane = 600f;
+                cam.transform.position = new Vector3(-60, 28, -150);
+                cam.transform.rotation = Quaternion.Euler(12, 20, 0);
             }
+            PostFx.Setup(Camera.main);
             // Show the city behind the menu.
             BuildCity(1931);
         }
@@ -224,7 +224,7 @@ namespace Sanguine.Client
                 case Msg.Teleport:
                 {
                     float x = r.Float(), z = r.Float();
-                    if (Local != null) Local.Teleport(new Vector3(x, 0.15f, z));
+                    if (Local != null) Local.Teleport(new Vector3(x, CityDressing.GroundHeight(x, z) + 0.05f, z));
                     break;
                 }
             }
@@ -237,7 +237,7 @@ namespace Sanguine.Client
             MyBloodline = w.Bloodline;
             BuildCity(w.CitySeed);
             if (_entityRoot == null) _entityRoot = new GameObject("Entities");
-            Local = LocalPlayer.Create(this, w.Bloodline, new Vector3(w.X, 0.15f, w.Z));
+            Local = LocalPlayer.Create(this, w.Bloodline, new Vector3(w.X, CityDressing.GroundHeight(w.X, w.Z) + 0.05f, w.Z));
             State = ClientState.InGame;
             StatusText = "";
             Chat.Clear();
@@ -263,10 +263,10 @@ namespace Sanguine.Client
                 EntityView v;
                 if (!Views.TryGetValue(s.Id, out v) || v == null)
                 {
-                    v = EntityView.Create(s.Id, s.Kind, _entityRoot.transform);
-                    Views[s.Id] = v;
                     EntityInfoMsg info;
-                    if (Infos.TryGetValue(s.Id, out info)) v.ApplyInfo(info);
+                    bool known = Infos.TryGetValue(s.Id, out info);
+                    v = EntityView.Create(s.Id, s.Kind, _entityRoot.transform, known ? info : (EntityInfoMsg?)null);
+                    Views[s.Id] = v;
                 }
                 v.ApplyState(s, now);
             }

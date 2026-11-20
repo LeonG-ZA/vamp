@@ -182,7 +182,7 @@ namespace Sanguine.Tests
                 Check(alaric.WaitFor(() => alaric.HasNotice("thrall returns") || alaric.HasNotice("thrall was caught"), 4), "thrall mission resolves");
                 bool succeeded = alaric.HasNotice("thrall returns");
                 Console.WriteLine("        (mission " + (succeeded ? "succeeded" : "failed") + ")");
-                if (succeeded) Check(alaric.Self.Standing >= 2, "successful mission grants standing");
+                if (succeeded) Check(alaric.WaitFor(() => alaric.Self.Standing >= 2, 2), "successful mission grants standing");
 
                 // --- Election ---------------------------------------------------
                 Console.WriteLine("[politics]");

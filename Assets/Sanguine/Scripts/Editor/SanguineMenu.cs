@@ -52,7 +52,11 @@ namespace Sanguine.EditorTools
                 targetGroup = BuildTargetGroup.Standalone,
                 options = BuildOptions.None
             };
+#if UNITY_2021_2_OR_NEWER
             if (server) opts.subtarget = (int)StandaloneBuildSubtarget.Server;
+#else
+            if (server) opts.options |= BuildOptions.EnableHeadlessMode;
+#endif
             var report = BuildPipeline.BuildPlayer(opts);
             UnityEngine.Debug.Log("Sanguine build " + report.summary.result + ": " + path);
         }

@@ -1,179 +1,340 @@
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Sanguine.Client
 {
-    /// <summary>Builds the visual city from the shared deterministic <see cref="CityLayout"/>.</summary>
+    /// <summary>
+    /// Builds the visual city from the shared <see cref="CityDressing"/>: textured buildings with lit
+    /// facades, sidewalks, wet roads with markings, Poly Haven street props and several hundred real lights.
+    /// Geometry is chunked per city block so frustum culling stays effective.
+    /// </summary>
     public static class CityBuilder
     {
-        private static readonly Color Asphalt = new Color(0.07f, 0.07f, 0.08f);
-        private static readonly Color Pavement = new Color(0.22f, 0.21f, 0.22f);
-        private static readonly Color Grass = new Color(0.08f, 0.16f, 0.07f);
-        private static readonly Color Window = new Color(1f, 0.78f, 0.4f);
-        private static readonly Color NeonPink = new Color(1f, 0.2f, 0.6f);
-        private static readonly Color NeonCyan = new Color(0.2f, 0.9f, 1f);
-        private static readonly Color LampColor = new Color(1f, 0.62f, 0.3f);
+        private static readonly Color White = Color.white;
 
         public static GameObject Build(CityLayout city)
         {
+            ArtLibrary.Load();
+            CityDressing dressing = CityDressing.Create(city);
+
             var root = new GameObject("City (seed " + city.Seed + ")");
-            Transform t = root.transform;
-            var rng = new Rng(city.Seed * 7 + 3); // visual-only randomness (windows etc.)
+            Transform chunksRoot = new GameObject("Blocks").transform;
+            chunksRoot.SetParent(root.transform, false);
+            Transform propsRoot = new GameObject("Props").transform;
+            propsRoot.SetParent(root.transform, false);
+            Transform lightsRoot = new GameObject("Lights").transform;
+            lightsRoot.SetParent(root.transform, false);
 
-            // Ground and outer walls.
-            float size = CityLayout.MapHalf * 2f + 20f;
-            Mats.Prim(PrimitiveType.Cube, t, new Vector3(0, -0.5f, 0), new Vector3(size, 1f, size), Asphalt);
-            float h = 30f, edge = CityLayout.MapHalf + 1f;
-            Color wall = new Color(0.04f, 0.04f, 0.05f);
-            Mats.Prim(PrimitiveType.Cube, t, new Vector3(0, h / 2, edge), new Vector3(size, h, 1), wall);
-            Mats.Prim(PrimitiveType.Cube, t, new Vector3(0, h / 2, -edge), new Vector3(size, h, 1), wall);
-            Mats.Prim(PrimitiveType.Cube, t, new Vector3(edge, h / 2, 0), new Vector3(1, h, size), wall);
-            Mats.Prim(PrimitiveType.Cube, t, new Vector3(-edge, h / 2, 0), new Vector3(1, h, size), wall);
+            System.Func<string, float> tile = ArtLibrary.Tile;
+            System.Func<string, Color, float, Material> material = (n, tint, e) => ArtLibrary.Surface(n, tint, e);
 
-            // Block slabs (sidewalks, parks, plazas).
-            for (int bx = 0; bx < CityLayout.Blocks; bx++)
-            {
-                for (int bz = 0; bz < CityLayout.Blocks; bz++)
+            // One mesh kit per city block, plus roads and the skyline.
+            var kits = new MeshKit[CityLayout.Blocks, CityLayout.Blocks];
+            var colliders = new List<Bounds>[CityLayout.Blocks, CityLayout.Blocks];
+            for (int x = 0; x < CityLayout.Blocks; x++)
+                for (int z = 0; z < CityLayout.Blocks; z++)
                 {
-                    float cx = CityLayout.BlockCenter(bx), cz = CityLayout.BlockCenter(bz);
-                    ZoneDef zone = city.ZoneAt(cx, cz);
-                    Color c = Pavement;
-                    if (city.Parks[bx, bz]) c = Grass;
-                    if (zone != null) c = zone.Kind == ZoneKind.Haven ? new Color(0.13f, 0.1f, 0.12f) : new Color(0.32f, 0.3f, 0.28f);
-                    Mats.Prim(PrimitiveType.Cube, t, new Vector3(cx, 0.06f, cz), new Vector3(CityLayout.BlockSize, 0.12f, CityLayout.BlockSize), c);
-                    if (zone != null) BuildZoneMarkers(t, zone);
+                    kits[x, z] = new MeshKit(tile);
+                    colliders[x, z] = new List<Bounds>();
                 }
+            var roads = new MeshKit(tile);
+            var markings = new MeshKit(tile);
+            var skyline = new MeshKit(tile);
+            var skylineColliders = new List<Bounds>();
+
+            // Roads and other ground surfaces.
+            foreach (SurfacePiece s in dressing.Surfaces)
+            {
+                int bx, bz;
+                if (s.Y > 0.01f && BlockOf((s.MinX + s.MaxX) * 0.5f, (s.MinZ + s.MaxZ) * 0.5f, out bx, out bz))
+                    kits[bx, bz].Floor(s.Material, White, 0f, s.MinX, s.MinZ, s.MaxX, s.MaxZ, s.Y);
+                else
+                    roads.Floor(s.Material, White, 0f, s.MinX, s.MinZ, s.MaxX, s.MaxZ, s.Y);
+            }
+            foreach (Stripe st in dressing.Stripes)
+                markings.Floor(SurfaceNames.Paint, White, 0f, st.CX - st.SX * 0.5f, st.CZ - st.SZ * 0.5f, st.CX + st.SX * 0.5f, st.CZ + st.SZ * 0.5f, 0.012f);
+
+            // Raised sidewalks, plazas and parks.
+            foreach (SlabPiece s in dressing.Slabs)
+            {
+                int bx, bz;
+                BlockOf((s.MinX + s.MaxX) * 0.5f, (s.MinZ + s.MaxZ) * 0.5f, out bx, out bz);
+                MeshKit k = kits[bx, bz];
+                k.Floor(s.TopMaterial, White, 0f, s.MinX, s.MinZ, s.MaxX, s.MaxZ, s.Height);
+                k.Ring(s.SideMaterial, White, 0f, s.MinX, s.MinZ, s.MaxX, s.MaxZ, 0f, s.Height, 0f);
+                colliders[bx, bz].Add(new Bounds(new Vector3((s.MinX + s.MaxX) * 0.5f, s.Height * 0.5f, (s.MinZ + s.MaxZ) * 0.5f),
+                                                 new Vector3(s.MaxX - s.MinX, s.Height, s.MaxZ - s.MinZ)));
             }
 
             // Buildings.
-            foreach (BuildingDef b in city.Buildings)
+            foreach (DressedBuilding d in dressing.Buildings)
             {
-                if (b.Style == BuildingStyle.Tree) { BuildTree(t, b); continue; }
-                Color c = StyleColor(b.Style, rng);
-                GameObject go = Mats.Prim(PrimitiveType.Cube, t, new Vector3(b.CX, b.Height / 2f, b.CZ), new Vector3(b.SX, b.Height, b.SZ), c);
-                go.name = b.Style.ToString();
-                if (b.Style == BuildingStyle.HavenCrypt || b.Style == BuildingStyle.SanctumHall) DecorateSpecial(t, b);
-                else AddWindows(t, b, rng);
+                int bx, bz;
+                BlockOf(d.Def.CX, d.Def.CZ, out bx, out bz);
+                AddBuilding(kits[bx, bz], d);
+                colliders[bx, bz].Add(new Bounds(new Vector3(d.Def.CX, d.BaseY + d.Def.Height * 0.5f, d.Def.CZ),
+                                                 new Vector3(d.Def.SX, d.Def.Height, d.Def.SZ)));
             }
 
-            // Street lamps at intersections; real lights on every other one.
-            foreach (StreetNode n in city.Nodes)
+            // Boxes: containers, pillars, neon signs, lit shop windows, skyline towers.
+            var rotatedColliders = new List<KeyValuePair<Bounds, float>>();
+            foreach (BoxPiece p in dressing.Boxes)
             {
-                Vector3 p = new Vector3(n.X + 4.2f, 0, n.Z + 4.2f);
-                Mats.Prim(PrimitiveType.Cylinder, t, p + new Vector3(0, 2.5f, 0), new Vector3(0.15f, 2.5f, 0.15f), new Color(0.1f, 0.1f, 0.1f), false);
-                Mats.Prim(PrimitiveType.Sphere, t, p + new Vector3(0, 5.1f, 0), new Vector3(0.5f, 0.5f, 0.5f), LampColor, false, true);
-                if ((n.GX + n.GZ) % 2 == 0)
+                var c = new Vector3(p.CX, p.CY, p.CZ);
+                var size = new Vector3(p.SX, p.SY, p.SZ);
+                var tint = new Color(p.R, p.G, p.B);
+                int bx, bz;
+                bool inBlock = BlockOf(p.CX, p.CZ, out bx, out bz);
+                MeshKit k = inBlock ? kits[bx, bz] : skyline;
+                k.Box(p.Material, tint, p.Emission, c, size, p.Yaw);
+                if (p.Collider)
                 {
-                    var lamp = new GameObject("Lamp Light");
-                    lamp.transform.SetParent(t, false);
-                    lamp.transform.position = p + new Vector3(0, 4.8f, 0);
-                    Light l = lamp.AddComponent<Light>();
-                    l.type = LightType.Point;
-                    l.color = LampColor;
-                    l.range = 16f;
-                    l.intensity = 1.6f;
+                    if (Mathf.Abs(p.Yaw) < 0.01f) (inBlock ? colliders[bx, bz] : skylineColliders).Add(new Bounds(c, size));
+                    else rotatedColliders.Add(new KeyValuePair<Bounds, float>(new Bounds(c, size), p.Yaw));
                 }
             }
 
-            // Combine static geometry for performance.
-            StaticBatchingUtility.Combine(root);
+            for (int x = 0; x < CityLayout.Blocks; x++)
+                for (int z = 0; z < CityLayout.Blocks; z++)
+                {
+                    GameObject chunk = kits[x, z].Build("Block " + x + "," + z, chunksRoot, material);
+                    AddColliders(chunk, colliders[x, z]);
+                }
+            GameObject roadGo = roads.Build("Roads", root.transform, material, false);
+            var ground = roadGo.AddComponent<BoxCollider>();
+            ground.center = new Vector3(0f, -0.5f, 0f);
+            ground.size = new Vector3(CityLayout.MapHalf * 2f + 60f, 1f, CityLayout.MapHalf * 2f + 60f);
+            markings.Build("Road markings", root.transform, material, false);
+            GameObject sky = skyline.Build("Skyline", root.transform, material);
+            AddColliders(sky, skylineColliders);
+            foreach (KeyValuePair<Bounds, float> rc in rotatedColliders)
+            {
+                var go = new GameObject("Collider");
+                go.transform.SetParent(root.transform, false);
+                go.transform.position = rc.Key.center;
+                go.transform.rotation = Quaternion.Euler(0f, rc.Value, 0f);
+                go.AddComponent<BoxCollider>().size = rc.Key.size;
+            }
+
+            // Props.
+            foreach (PropPlacement p in dressing.Props) SpawnProp(p, propsRoot);
+
+            // Lights.
+            var director = root.AddComponent<CityLights>();
+            foreach (LightPlacement l in dressing.Lights) director.Add(CreateLight(l, lightsRoot), l.Kind);
+
+            // Static geometry batching (procedural meshes only; imported props stay instanced).
+            StaticBatchingUtility.Combine(chunksRoot.gameObject);
             return root;
         }
 
-        private static Color StyleColor(BuildingStyle s, Rng rng)
+        private static bool BlockOf(float x, float z, out int bx, out int bz)
         {
-            float v = rng.Range(-0.03f, 0.03f);
-            switch (s)
+            bx = Mathf.FloorToInt((x - CityLayout.Origin) / CityLayout.Pitch);
+            bz = Mathf.FloorToInt((z - CityLayout.Origin) / CityLayout.Pitch);
+            bool inside = bx >= 0 && bz >= 0 && bx < CityLayout.Blocks && bz < CityLayout.Blocks;
+            bx = Mathf.Clamp(bx, 0, CityLayout.Blocks - 1);
+            bz = Mathf.Clamp(bz, 0, CityLayout.Blocks - 1);
+            return inside;
+        }
+
+        private static void AddColliders(GameObject go, List<Bounds> boxes)
+        {
+            foreach (Bounds b in boxes)
             {
-                case BuildingStyle.Warehouse: return new Color(0.2f + v, 0.17f + v, 0.15f + v);
-                case BuildingStyle.Tower: return new Color(0.12f + v, 0.15f + v, 0.2f + v);
-                case BuildingStyle.OldStone: return new Color(0.26f + v, 0.23f + v, 0.2f + v);
-                case BuildingStyle.Club: return new Color(0.1f + v, 0.06f, 0.12f + v);
-                case BuildingStyle.HavenCrypt: return new Color(0.16f, 0.13f, 0.15f);
-                case BuildingStyle.SanctumHall: return new Color(0.55f, 0.52f, 0.47f);
-                default: return new Color(0.18f + v, 0.18f + v, 0.2f + v);
+                var c = go.AddComponent<BoxCollider>();
+                c.center = b.center;
+                c.size = b.size;
             }
         }
 
-        private static void AddWindows(Transform t, BuildingDef b, Rng rng)
+        private static void AddBuilding(MeshKit k, DressedBuilding d)
         {
-            int floors = Mathf.Max(1, Mathf.FloorToInt(b.Height / 3.5f));
-            int count = Mathf.Min(14, 2 + floors / 2);
-            Color lit = b.Style == BuildingStyle.Club ? (rng.NextFloat() < 0.5f ? NeonPink : NeonCyan) : Window;
-            for (int i = 0; i < count; i++)
+            BuildingDef b = d.Def;
+            float minX = b.CX - b.SX * 0.5f, maxX = b.CX + b.SX * 0.5f, minZ = b.CZ - b.SZ * 0.5f, maxZ = b.CZ + b.SZ * 0.5f;
+            float y0 = d.BaseY, top = d.Top;
+            float band = d.GroundMaterial != null ? d.BandHeight : 0f;
+
+            if (band > 0f) k.Ring(d.GroundMaterial, White, 0f, minX, minZ, maxX, maxZ, y0, y0 + band, y0, d.UOffset);
+            float upper = y0 + band, wallTop = top + d.ParapetHeight;
+            k.Ring(d.UpperMaterial, White, 0f, minX, minZ, maxX, maxZ, upper, wallTop, upper, d.UOffset, d.VOffset);
+
+            if (d.ParapetHeight > 0f)
             {
-                int face = rng.Range(0, 4);
-                float y = 2f + rng.Range(0, floors) * 3.5f;
-                if (y > b.Height - 1f) continue;
-                float along = rng.Range(-0.4f, 0.4f);
-                Vector3 pos, scale;
-                if (face < 2)
-                {
-                    float z = b.CZ + (face == 0 ? b.SZ / 2f + 0.02f : -b.SZ / 2f - 0.02f);
-                    pos = new Vector3(b.CX + along * b.SX, y, z);
-                    scale = new Vector3(1.4f, 1.6f, 0.05f);
-                }
-                else
-                {
-                    float x = b.CX + (face == 2 ? b.SX / 2f + 0.02f : -b.SX / 2f - 0.02f);
-                    pos = new Vector3(x, y, b.CZ + along * b.SZ);
-                    scale = new Vector3(0.05f, 1.6f, 1.4f);
-                }
-                Mats.Prim(PrimitiveType.Cube, t, pos, scale, rng.NextFloat() < 0.15f ? new Color(0.5f, 0.7f, 1f) : lit, false, true);
+                const float inset = 0.3f;
+                k.Ring(d.TrimMaterial, White, 0f, minX + inset, minZ + inset, maxX - inset, maxZ - inset, top, wallTop, top, 0f, 0f, true);
+                k.Floor(d.TrimMaterial, White, 0f, minX, minZ, maxX, minZ + inset, wallTop);
+                k.Floor(d.TrimMaterial, White, 0f, minX, maxZ - inset, maxX, maxZ, wallTop);
+                k.Floor(d.TrimMaterial, White, 0f, minX, minZ + inset, minX + inset, maxZ - inset, wallTop);
+                k.Floor(d.TrimMaterial, White, 0f, maxX - inset, minZ + inset, maxX, maxZ - inset, wallTop);
+                k.Floor(d.RoofMaterial, White, 0f, minX + inset, minZ + inset, maxX - inset, maxZ - inset, top);
             }
-            if (b.Style == BuildingStyle.Club)
+            else k.Floor(d.RoofMaterial, White, 0f, minX, minZ, maxX, maxZ, top);
+
+            if (d.Fascia && band > 0f)
             {
-                // Neon sign over the door.
-                Mats.Prim(PrimitiveType.Cube, t, new Vector3(b.CX, 4f, b.CZ - b.SZ / 2f - 0.1f), new Vector3(b.SX * 0.6f, 0.4f, 0.1f), lit, false, true);
+                // A protruding sign band / cornice between the shop fronts and the upper floors.
+                float fy0 = y0 + band - 0.55f, fy1 = y0 + band, o = 0.22f;
+                k.Ring(d.TrimMaterial, White, 0f, minX - o, minZ - o, maxX + o, maxZ + o, fy0, fy1, fy0);
+                k.Floor(d.TrimMaterial, White, 0f, minX - o, minZ - o, maxX + o, maxZ + o, fy1);
+                k.Floor(d.TrimMaterial, White, 0f, minX - o, minZ - o, maxX + o, maxZ + o, fy0, true);
             }
         }
 
-        private static void BuildTree(Transform t, BuildingDef b)
+        private static void SpawnProp(PropPlacement p, Transform parent)
         {
-            Mats.Prim(PrimitiveType.Cylinder, t, new Vector3(b.CX, b.Height / 2f, b.CZ), new Vector3(0.4f, b.Height / 2f, 0.4f), new Color(0.15f, 0.1f, 0.07f));
-            Mats.Prim(PrimitiveType.Sphere, t, new Vector3(b.CX, b.Height + 1f, b.CZ), new Vector3(3.5f, 3f, 3.5f), new Color(0.06f, 0.13f, 0.06f), false);
-        }
-
-        private static void DecorateSpecial(Transform t, BuildingDef b)
-        {
-            bool haven = b.Style == BuildingStyle.HavenCrypt;
-            if (haven)
+            GameObject prefab = ArtLibrary.PropPrefab(p.Id);
+            PropInfo info = PropCatalog.Get(p.Id);
+            GameObject go;
+            if (prefab != null)
             {
-                // Pitched roof and a door.
-                GameObject roof = Mats.Prim(PrimitiveType.Cube, t, new Vector3(b.CX, b.Height + 0.6f, b.CZ), new Vector3(b.SX * 0.75f, 1.2f, b.SZ * 0.75f), new Color(0.08f, 0.07f, 0.08f), false);
-                roof.transform.rotation = Quaternion.Euler(0, 45, 0);
-                Mats.Prim(PrimitiveType.Cube, t, new Vector3(b.CX, 1.4f, b.CZ - b.SZ / 2f - 0.05f), new Vector3(1.6f, 2.8f, 0.1f), new Color(0.35f, 0.05f, 0.05f), false, true);
+                go = Object.Instantiate(prefab, parent);
+                go.name = p.Id;
             }
             else
             {
-                // Columns along the front of the hall.
-                for (int i = 0; i < 6; i++)
-                {
-                    float x = b.CX - b.SX / 2f + 2f + i * (b.SX - 4f) / 5f;
-                    Mats.Prim(PrimitiveType.Cylinder, t, new Vector3(x, b.Height / 2f, b.CZ - b.SZ / 2f - 1.5f), new Vector3(1f, b.Height / 2f, 1f), new Color(0.7f, 0.67f, 0.6f));
-                }
-                Mats.Prim(PrimitiveType.Cube, t, new Vector3(b.CX, b.Height + 0.5f, b.CZ - 1.5f), new Vector3(b.SX + 1f, 1f, b.SZ + 3f), new Color(0.6f, 0.57f, 0.5f), false);
-                Mats.Prim(PrimitiveType.Cube, t, new Vector3(b.CX, 3f, b.CZ - b.SZ / 2f - 0.05f), new Vector3(4f, 6f, 0.1f), new Color(1f, 0.85f, 0.5f), false, true);
+                go = FallbackProp(p.Id, parent);
+                if (go == null) return;
+            }
+            go.transform.position = new Vector3(p.X, p.Y, p.Z);
+            go.transform.rotation = Quaternion.Euler(0f, p.Yaw, 0f);
+            go.transform.localScale = new Vector3(p.ScaleX, p.ScaleY, p.ScaleZ);
+
+            float size = info != null ? Mathf.Max(info.Width * p.ScaleX, info.Height * p.ScaleY, info.Depth * p.ScaleZ) : 1f;
+            Renderer[] renderers = go.GetComponentsInChildren<Renderer>();
+            if (renderers.Length > 0)
+            {
+                // Cull small props once they shrink to a few pixels.
+                var lod = go.AddComponent<LODGroup>();
+                float cull = size < 1.2f ? 0.018f : (size < 3f ? 0.007f : 0.002f);
+                lod.SetLODs(new[] { new LOD(cull, renderers) });
+                lod.RecalculateBounds();
+            }
+            if (p.Collider && info != null)
+            {
+                var col = go.AddComponent<BoxCollider>();
+                col.center = new Vector3((info.MinX + info.MaxX) * 0.5f, (info.MinY + info.MaxY) * 0.5f, (info.MinZ + info.MaxZ) * 0.5f);
+                col.size = new Vector3(info.Width, info.Height, info.Depth);
             }
         }
 
-        private static void BuildZoneMarkers(Transform t, ZoneDef z)
+        /// <summary>Simple stand-ins when the imported props are unavailable (e.g. glTFast not installed).</summary>
+        private static GameObject FallbackProp(string id, Transform parent)
         {
-            Color c = z.Kind == ZoneKind.Haven ? Mats.BloodlineColor(z.Owner) : new Color(0.95f, 0.85f, 0.55f);
-            float hs = z.HalfSize;
-            // Glowing border strips around the plaza.
-            Mats.Prim(PrimitiveType.Cube, t, new Vector3(z.CenterX, 0.15f, z.CenterZ - hs), new Vector3(hs * 2, 0.08f, 0.4f), c, false, true);
-            Mats.Prim(PrimitiveType.Cube, t, new Vector3(z.CenterX, 0.15f, z.CenterZ + hs), new Vector3(hs * 2, 0.08f, 0.4f), c, false, true);
-            Mats.Prim(PrimitiveType.Cube, t, new Vector3(z.CenterX - hs, 0.15f, z.CenterZ), new Vector3(0.4f, 0.08f, hs * 2), c, false, true);
-            Mats.Prim(PrimitiveType.Cube, t, new Vector3(z.CenterX + hs, 0.15f, z.CenterZ), new Vector3(0.4f, 0.08f, hs * 2), c, false, true);
+            var go = new GameObject(id + " (fallback)");
+            go.transform.SetParent(parent, false);
+            Transform t = go.transform;
+            switch (id)
+            {
+                case "street_lamp":
+                    Mats.Prim(PrimitiveType.Cylinder, t, new Vector3(0, 1.8f, 0), new Vector3(0.14f, 1.8f, 0.14f), new Color(0.08f, 0.08f, 0.08f), false);
+                    Mats.Prim(PrimitiveType.Sphere, t, new Vector3(0, 3.3f, 0), Vector3.one * 0.45f, new Color(1f, 0.75f, 0.45f), false, true);
+                    break;
+                case "covered_car":
+                    Mats.Prim(PrimitiveType.Cube, t, new Vector3(0, 0.7f, 0), new Vector3(1.8f, 1.2f, 4.3f), new Color(0.12f, 0.13f, 0.15f), false);
+                    break;
+                case "security_light":
+                    Mats.Prim(PrimitiveType.Cube, t, new Vector3(0, 0.2f, 0.2f), new Vector3(0.3f, 0.3f, 0.4f), new Color(0.1f, 0.1f, 0.1f), false);
+                    break;
+                case "shutter_door":
+                case "shutter_door_graffiti":
+                    Mats.Prim(PrimitiveType.Cube, t, new Vector3(0, 1.2f, 0.05f), new Vector3(1.08f, 2.4f, 0.1f), new Color(0.35f, 0.36f, 0.38f), false);
+                    break;
+                case "fire_barrel":
+                case "barrel":
+                case "trash_can":
+                case "trash_can_rusty":
+                    Mats.Prim(PrimitiveType.Cylinder, t, new Vector3(0, 0.45f, 0), new Vector3(0.55f, 0.45f, 0.55f), new Color(0.25f, 0.2f, 0.17f), false);
+                    break;
+                default:
+                    Object.Destroy(go);
+                    return null;
+            }
+            return go;
+        }
 
-            var go = new GameObject("Zone Light " + z.Name);
-            go.transform.SetParent(t, false);
-            go.transform.position = new Vector3(z.CenterX, 6f, z.CenterZ - 10f);
+        private static Light CreateLight(LightPlacement p, Transform parent)
+        {
+            var go = new GameObject(p.Kind + " light");
+            go.transform.SetParent(parent, false);
+            go.transform.position = new Vector3(p.X, p.Y, p.Z);
             Light l = go.AddComponent<Light>();
             l.type = LightType.Point;
-            l.color = c;
-            l.range = 26f;
-            l.intensity = 2f;
+            l.color = new Color(p.R, p.G, p.B);
+            l.range = p.Range;
+            l.intensity = p.Intensity;
+            l.shadows = LightShadows.None;
+            l.bounceIntensity = 0f;
+            if (p.Kind == LightKind.Fire) go.AddComponent<LightFlicker>();
+            return l;
+        }
+    }
+
+    /// <summary>Keeps hundreds of city lights affordable: distant lights are switched off and the few lamps
+    /// nearest the camera cast soft shadows (characters and props throw real shadows under street lamps).</summary>
+    public sealed class CityLights : MonoBehaviour
+    {
+        public int ShadowCasters = 4;
+        public float ActiveRadius = 140f;
+
+        private readonly List<Light> _lights = new List<Light>();
+        private readonly List<LightKind> _kinds = new List<LightKind>();
+        private float _next;
+
+        public void Add(Light l, LightKind kind)
+        {
+            _lights.Add(l);
+            _kinds.Add(kind);
+        }
+
+        private void Update()
+        {
+            if (Time.unscaledTime < _next) return;
+            _next = Time.unscaledTime + 0.4f;
+            Camera cam = Camera.main;
+            if (cam == null) return;
+            Vector3 c = cam.transform.position;
+
+            // Nearest shadow-casting candidates (street lamps and floodlights).
+            var nearest = new List<KeyValuePair<float, Light>>();
+            for (int i = 0; i < _lights.Count; i++)
+            {
+                Light l = _lights[i];
+                if (l == null) continue;
+                float d = (l.transform.position - c).sqrMagnitude;
+                bool on = d < ActiveRadius * ActiveRadius;
+                if (l.enabled != on) l.enabled = on;
+                l.shadows = LightShadows.None;
+                if (on && (_kinds[i] == LightKind.Lamp || _kinds[i] == LightKind.Security))
+                    nearest.Add(new KeyValuePair<float, Light>(d, l));
+            }
+            nearest.Sort((a, b) => a.Key.CompareTo(b.Key));
+            for (int i = 0; i < nearest.Count && i < ShadowCasters; i++)
+            {
+                nearest[i].Value.shadows = LightShadows.Soft;
+                nearest[i].Value.shadowStrength = 0.85f;
+            }
+        }
+    }
+
+    /// <summary>Fire-barrel flicker.</summary>
+    public sealed class LightFlicker : MonoBehaviour
+    {
+        private Light _light;
+        private float _base, _seed;
+
+        private void Awake()
+        {
+            _light = GetComponent<Light>();
+            _base = _light.intensity;
+            _seed = Random.value * 100f;
+        }
+
+        private void Update()
+        {
+            float t = Time.time * 7f + _seed;
+            _light.intensity = _base * (0.75f + 0.25f * Mathf.PerlinNoise(t, _seed) + 0.1f * Mathf.Sin(t * 3.3f));
         }
     }
 }
