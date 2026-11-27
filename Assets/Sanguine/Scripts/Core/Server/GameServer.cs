@@ -295,7 +295,7 @@ namespace Sanguine.Server
             s.Send(new WelcomeMsg { EntityId = p.Id, Name = prof.Name, Bloodline = prof.Bloodline, CitySeed = _cfg.CitySeed, X = p.X, Z = p.Z, NewCharacter = isNew }.Write());
             SendSelfState(p);
             SendWorldState(p);
-            Log(prof.Name + (isNew ? " was embraced (new " : " rises (") + def.Name + ").");
+            Log(prof.Name + (isNew ? " rises for the first time (new " : " rises (") + def.Name + ").");
 
             if (isNew)
             {

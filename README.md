@@ -129,6 +129,18 @@ The repository doesn't ship realistic human models yet. None of the CC0 sources 
 
 Chat commands: `/help /who /stats /districts /gifts /learn /say /c /lin /city /circle … /vote /thrall /hunt /edict /embrace /accept /refuse /lineage …`.
 
+## Releases
+
+[GitHub Releases](https://github.com/LeonG-ZA/vamp/releases) carry the dedicated server for Linux and Windows as single self-contained executables (no .NET install needed). Play the client from the source in Unity.
+
+To make a release, write the notes in `Docs/releases/<tag>.md`, then push a version tag:
+
+```bash
+git tag -a v0.2.0 -m "Sanguine City 0.2.0" && git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` then runs the integration test, builds the servers and publishes the release. `v0.x` tags are published as pre-releases.
+
 ## Dedicated server without Unity
 
 The server is plain C# with no UnityEngine dependency. The same source files compile into Unity and into a console app:
@@ -162,6 +174,8 @@ Server options: `--port --seed --save --night --day --mortals --max-players --de
 
 ```bash
 Server/build.sh && mono Server/bin/SanguineTests.exe     # 99 passed, 0 failed
+# or with the .NET 8 SDK
+dotnet run --project Server/Tests/SanguineTests.csproj
 ```
 
 ## Project layout
@@ -173,8 +187,9 @@ Assets/Sanguine/Scripts/Core/      Sanguine.Core asmdef (no UnityEngine): shared
 Assets/Sanguine/Scripts/Client/    Sanguine.Client asmdef: Bootstrap, GameClient, LocalPlayer, EntityView,
                                    CityBuilder, Atmosphere, ClientUI (IMGUI), Mats
 Assets/Sanguine/Scripts/Editor/    Menu items: create scene, build clients / dedicated server
-Server/                            Standalone dedicated server (csproj + Mono build script) and integration test
-Docs/                              Research notes and the design document
+Server/                            Standalone dedicated server (csproj + Mono build script) and integration test (csproj)
+.github/workflows/release.yml      Tag-triggered release: tests, server builds, GitHub release
+Docs/                              Research notes, the design document and release notes
 Tools/assets/                      CC0 art download + conversion pipeline (Python + glTF-Transform)
 Tools/preview/                     Live-server scene export + three.js preview renderer
 Assets/Sanguine/Resources/         Generated art: Textures/, Props/ (GLB), Sky/ (HDR), templates, sky shader

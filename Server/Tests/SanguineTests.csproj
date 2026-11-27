@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Integration test: starts a real server and drives it with bot clients over TCP.
+       Run it with "dotnet run" on this project, or build it with Mono via Server/build.sh. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>SanguineTests</AssemblyName>
+    <RootNamespace>Sanguine.Tests</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/Sanguine/Scripts/Core/**/*.cs" />
+    <Compile Include="IntegrationTest.cs" />
+  </ItemGroup>
+</Project>

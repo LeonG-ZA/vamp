@@ -9,6 +9,7 @@
 /[Mm]emoryCaptures/
 *.csproj
 !/Server/SanguineServer.csproj
+!/Server/Tests/SanguineTests.csproj
 *.sln
 *.suo
 *.user
@@ -22,6 +23,8 @@
 # Dedicated server build output and save data
 /Server/bin/
 /Server/obj/
+/Server/Tests/bin/
+/Server/Tests/obj/
 /save/
 /Server/save/
 

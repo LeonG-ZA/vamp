@@ -1,0 +1,56 @@
+# Builds and publishes a GitHub release when a version tag (v1.2.3) is pushed:
+#   git tag -a v0.1.0 -m "Sanguine City 0.1.0" && git push origin v0.1.0
+# Release notes come from Docs/releases/<tag>.md (falling back to GitHub's generated notes).
+# v0.x and tags with a suffix (v1.0.0-rc1) are published as pre-releases.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Integration tests
+        run: dotnet run --project Server/Tests/SanguineTests.csproj -c Release
+
+      - name: Publish the dedicated server
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          mkdir -p dist
+          for rid in linux-x64 win-x64; do
+            dotnet publish Server/SanguineServer.csproj -c Release -r "$rid" --self-contained true \
+              -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:InvariantGlobalization=true \
+              -p:DebugType=none -o "out/$rid"
+            cp README.md CREDITS.md "out/$rid/"
+          done
+          ./out/linux-x64/SanguineServer --help
+          tar -C out/linux-x64 -czf "dist/SanguineServer-${tag}-linux-x64.tar.gz" .
+          (cd out/win-x64 && zip -qr "../../dist/SanguineServer-${tag}-win-x64.zip" .)
+          (cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          notes="Docs/releases/${tag}.md"
+          args=(--title "Sanguine City ${tag}" --verify-tag)
+          if [ -f "$notes" ]; then args+=(--notes-file "$notes"); else args+=(--generate-notes); fi
+          case "$tag" in v0.*|*-*) args+=(--prerelease) ;; esac
+          gh release create "$tag" dist/* "${args[@]}"
