@@ -124,10 +124,11 @@ Server options: `--port --seed --save --night --day --mortals --max-players --de
 - thrall missions;
 - voting, dawn, the Regent and blood hunts;
 - PvP rules (circle immunity, Outlaw, torpor and respawn) and sanctums;
+- collision with buildings and hunters routing around them along the streets;
 - persistence across a server restart.
 
 ```bash
-Server/build.sh && mono Server/bin/SanguineTests.exe     # 36 passed, 0 failed
+Server/build.sh && mono Server/bin/SanguineTests.exe     # 46 passed, 0 failed
 ```
 
 ## Project layout
@@ -149,7 +150,7 @@ Assets/Sanguine/Resources/         Generated art: Textures/, Props/ (GLB), Sky/ 
 ## Notes and limitations
 
 - This is a playable prototype, not a production MMO.
-  - Movement is client-predicted and speed-checked by the server, but the server does not collide against buildings.
+  - Movement is client-predicted. The server checks speed and building collision, but small props such as parked cars are only solid on the client.
   - Transport is TCP.
   - Persistence uses flat files.
   - See the roadmap in `Docs/DESIGN.md`.

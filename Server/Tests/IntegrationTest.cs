@@ -231,6 +231,59 @@ namespace Sanguine.Tests
                 beatrix.Conn.Send(SimpleMsg.Attack(corvin.Id));
                 Check(beatrix.WaitFor(() => beatrix.HasNotice("forbidden in a sanctum"), 3), "violence is blocked inside a sanctum");
 
+                // --- Collision and pathfinding ---------------------------------------
+                Console.WriteLine("[collision]");
+                CityCollision col = server.Collision;
+                CityDressing dressing = CityDressing.Create(server.City);
+                DressedBuilding tower = dressing.Buildings.Find(b => b.Def.Style == BuildingStyle.Normal && (b.StreetFaces & 1) != 0);
+                BuildingDef bd = tower.Def;
+                Check(col.SolidCount > 150, "server knows the city's solid geometry (" + col.SolidCount + " obstacles)");
+                Check(col.IsSolid(bd.CX, bd.CZ) && !col.IsSolid(server.City.Nodes[40].X, server.City.Nodes[40].Z), "buildings are solid, streets are clear");
+                Check(!col.LineOfSight(bd.CX - bd.SX, bd.CZ, bd.CX + bd.SX, bd.CZ) && col.LineOfSight(-150, -200, 150, -200), "line of sight is blocked by buildings, open along streets");
+                Check(col.Route(0, CityLayout.NodeIndex(8, 8)).Count == 17, "street route between opposite corners has 17 nodes");
+
+                // Walk up to a building, then try to walk into it.
+                float fx = bd.CX, fz = bd.CZ + bd.SZ * 0.5f;
+                Func<float, string> Fmt = v => v.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+                alaric.Say("/tp " + Fmt(fx) + " " + Fmt(fz + 0.9f));
+                alaric.WaitFor(() => Math.Abs(alaric.Z - (fz + 0.9f)) < 0.05f, 2);
+                Thread.Sleep(200);
+                alaric.Conn.Send(SimpleMsg.Move(fx, fz - 0.6f, 180f));
+                alaric.Chat.Clear();
+                alaric.Say("/pos");
+                Check(alaric.WaitFor(() => alaric.HasChat("pos " + Fmt(fx).TrimEnd('0').TrimEnd('.')), 2) && alaric.Chat.Exists(c => c.Contains("pos") && c.Contains(" " + (fz + 0.9f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))),
+                      "moving into a building is rejected");
+                Thread.Sleep(200);
+                alaric.Conn.Send(SimpleMsg.Move(fx + 1.0f, fz + 0.9f, 90f));
+                alaric.Chat.Clear();
+                alaric.Say("/pos");
+                Check(alaric.WaitFor(() => alaric.Chat.Exists(c => c.Contains("pos " + (fx + 1.0f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))), 2),
+                      "moving along the sidewalk is accepted");
+
+                // A hunter must close in without ever passing through a building.
+                alaric.Say("/setexposure 65");
+                bool spawned = alaric.WaitFor(() => alaric.Entities.Exists(e => e.Kind == EntityKind.Hunter), 6);
+                Check(spawned, "exposure summons a hunter");
+                bool insideWall = false;
+                float firstDist = -1, lastDist = -1;
+                DateTime until = DateTime.UtcNow.AddSeconds(6);
+                while (spawned && DateTime.UtcNow < until)
+                {
+                    alaric.Pump();
+                    foreach (EntityState e in alaric.Entities)
+                    {
+                        if (e.Kind != EntityKind.Hunter) continue;
+                        if (col.IsSolid(e.X, e.Z, -0.2f)) insideWall = true;
+                        float dd = Entity.Dist(e.X, e.Z, alaric.X, alaric.Z);
+                        if (firstDist < 0) firstDist = dd;
+                        lastDist = dd;
+                    }
+                    Thread.Sleep(50);
+                }
+                Check(spawned && !insideWall, "hunters never walk through buildings");
+                Check(spawned && lastDist < firstDist - 5f, "the hunter closes in along the streets (" + firstDist.ToString("0") + " m -> " + lastDist.ToString("0") + " m)");
+                alaric.Say("/setexposure 0");
+
                 // --- Persistence -----------------------------------------------------
                 Console.WriteLine("[persistence]");
                 int standing = alaric.Self.Standing;

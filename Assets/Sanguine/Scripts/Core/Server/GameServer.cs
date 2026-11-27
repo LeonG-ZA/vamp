@@ -18,6 +18,7 @@ namespace Sanguine.Server
         private readonly ServerConfig _cfg;
         private readonly Store _store;
         private readonly CityLayout _city;
+        private readonly CityCollision _collision;
         private readonly Random _rand;
         private readonly Stopwatch _clock = new Stopwatch();
         private readonly ConcurrentQueue<Connection> _pendingConnections = new ConcurrentQueue<Connection>();
@@ -49,12 +50,14 @@ namespace Sanguine.Server
         public bool IsRunning { get { return _running; } }
         public int OnlinePlayers { get { lock (_players) return _players.Count; } }
         public CityLayout City { get { return _city; } }
+        public CityCollision Collision { get { return _collision; } }
 
         public GameServer(ServerConfig cfg)
         {
             _cfg = cfg;
             _rand = cfg.SimSeed != 0 ? new Random(cfg.SimSeed) : new Random();
             _city = new CityLayout(cfg.CitySeed);
+            _collision = new CityCollision(_city, CityDressing.Create(_city));
             _store = new Store(cfg.SaveDirectory, cfg.Log);
             _profiles = _store.LoadAllProfiles();
             _world = _store.LoadWorld();
@@ -353,7 +356,9 @@ namespace Sanguine.Server
             }
 
             float allowed = (float)(GameRules.WalkSpeed * SpeedMultiplier(p) * 1.35 * Math.Min(elapsed + 0.1, 1.0)) + 0.3f;
-            if (frozen || d > allowed)
+            // Reject speed hacks and walking through walls (solids shrunk slightly: the client's capsule
+            // already keeps the player ~0.4 m from walls, so honest clients never trip this).
+            if (frozen || d > allowed || _collision.IsSolid(x, z, -0.15f))
             {
                 p.Session.Send(SimpleMsg.Teleport(p.X, p.Z));
                 return;

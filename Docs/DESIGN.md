@@ -117,7 +117,8 @@ Circle chat is `/c`. A circle dissolves when its last member leaves.
   - Entity names and circles go in an `EntityInfo` message the first time an entity is seen, and again when they change.
 - **Movement:** the client moves locally and sends its position at 15 Hz.
   - The server checks each move against the speed limit and the root/torpor/feeding states. A failed move gets a `Teleport` correction.
-  - The server has no building collision yet (see roadmap).
+  - The server knows the same solid geometry as the client (`CityCollision`, built from `CityDressing`) and rejects moves into buildings.
+- **NPC navigation:** hunters and charmed mortals chase directly while the target is in line of sight; otherwise they follow an A* route over the street grid, aiming for the farthest route node they can see.
 - **City:** a deterministic layout from a shared seed (`CityLayout.cs`, xorshift RNG), so server AI and client visuals agree.
 - **Persistence:** plain-text files (profiles, plus world state: circles, influence, regent, edict).
   - Passwords are stored as salted SHA-256.
@@ -126,7 +127,7 @@ Circle chat is `/c`. A circle dissolves when its last member leaves.
 
 ## 8. Roadmap (beyond the prototype)
 
-- Server-side building collision and lag compensation; move to UDP (e.g. Unity Transport) for scale.
+- Lag compensation; move to UDP (e.g. Unity Transport) for scale.
 - Sire/childe lineage (the Embrace as a player action), with brood-style ties.
 - More gifts per bloodline, unlocked by spending standing; animated character models.
 - Hunting-ground ownership inside districts; NPC informants; police and media reacting to exposure.

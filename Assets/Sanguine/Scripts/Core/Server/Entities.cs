@@ -48,6 +48,8 @@ namespace Sanguine.Server
         public int TargetPlayer;               // entity id
         public double NextAttack;
         public double LostTargetSince = -1;
+        public float WayX, WayZ;               // current street-route waypoint
+        public double NextRepath;
 
         public override bool IsDown { get { return Health <= 0f; } }
     }

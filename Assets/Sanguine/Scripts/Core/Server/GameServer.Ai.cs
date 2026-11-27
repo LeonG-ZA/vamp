@@ -163,7 +163,11 @@ namespace Sanguine.Server
                             m.TargetNode = _city.NearestNode(m.X, m.Z);
                             break;
                         }
-                        MoveToward(m, charmer.X, charmer.Z, GameRules.MortalWalkSpeed * 1.5f, dt, 1.5f);
+                        float wx, wz;
+                        _collision.NextWaypoint(m.X, m.Z, charmer.X, charmer.Z, out wx, out wz);
+                        bool direct = wx == charmer.X && wz == charmer.Z;
+                        if (_collision.LineOfSight(m.X, m.Z, wx, wz, 0.25f))
+                            MoveToward(m, wx, wz, GameRules.MortalWalkSpeed * 1.5f, dt, direct ? 1.5f : 0.3f);
                         break;
                     }
                     case MortalMode.Entranced:
@@ -254,7 +258,21 @@ namespace Sanguine.Server
                 if (h.IsStunned(_now)) continue;
 
                 float dist = h.DistanceTo(target);
-                if (dist > 1.6f) MoveToward(h, target.X, target.Z, GameRules.HunterSpeed, dt, 1.5f);
+                if (dist > 1.6f)
+                {
+                    // Chase directly when the target is in sight, otherwise follow the streets around buildings.
+                    if (_now >= h.NextRepath)
+                    {
+                        h.NextRepath = _now + 0.3;
+                        _collision.NextWaypoint(h.X, h.Z, target.X, target.Z, out h.WayX, out h.WayZ);
+                    }
+                    bool direct = _collision.LineOfSight(h.X, h.Z, target.X, target.Z);
+                    if (direct) MoveToward(h, target.X, target.Z, GameRules.HunterSpeed, dt, 1.5f);
+                    else if (_collision.LineOfSight(h.X, h.Z, h.WayX, h.WayZ, 0.25f))
+                    {
+                        if (MoveToward(h, h.WayX, h.WayZ, GameRules.HunterSpeed, dt, 0.3f)) h.NextRepath = 0;
+                    }
+                }
                 else h.Rot = Heading(target.X - h.X, target.Z - h.Z);
 
                 if (dist <= 2.0f && _now >= h.NextAttack)
