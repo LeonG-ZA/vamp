@@ -572,6 +572,133 @@ def power_dominate():
     return fade(normalize(reverb(x, 3.0, 0.4), -2.0))
 
 
+def _gauss(tt, t0, w):
+    return np.exp(-((tt - t0) / w) ** 2)
+
+
+def power_shroud():
+    """Umbren Shroud: a dark, descending breath as the shadows fold shut."""
+    r = rng(350)
+    dur = 1.7
+    tt = t_axis(dur)
+    n = len(tt)
+    x = np.zeros(n)
+    for i, (lo, hi) in enumerate([(2500, 6000), (1400, 3200), (700, 1800), (300, 900), (120, 450)]):
+        x += band(r.standard_normal(n), lo, hi) * _gauss(tt, 0.15 + 0.17 * i, 0.2) * (0.25 + 0.05 * i)
+    x += np.sin(TAU * 55 * tt + 0.4 * np.sin(TAU * 0.8 * tt)) * np.sin(np.pi * np.clip(tt / 1.3, 0, 1)) ** 2 * 0.25
+    return fade(normalize(reverb(x, 1.6, 0.3, damp=3000), -4.0), 0.002, 0.2)
+
+
+def power_whispers():
+    """Umbren Whispers: half-heard voices from every direction, and the squeak of the rats who carry them."""
+    r = rng(351)
+    dur = 2.6
+    n = int(dur * SR)
+    x = np.zeros(n)
+    for v in range(9):
+        vd = r.uniform(0.45, 0.9)
+        vt = t_axis(vd)
+        breath = r.standard_normal(len(vt))
+        f1, f2 = r.uniform(500, 900), r.uniform(1300, 2300)
+        voice = band(breath, f1 * 0.8, f1 * 1.25) * 0.6 + band(breath, f2 * 0.85, f2 * 1.2) * 0.5 + band(breath, 3000, 7000) * 0.5
+        syll = np.clip(np.sin(TAU * r.uniform(4, 7) * vt + r.uniform(0, TAU)), 0, 1) ** 1.5
+        voice *= syll * np.sin(np.pi * vt / vd) ** 2 * r.uniform(0.25, 0.5)
+        add_at(x, voice, int(r.uniform(0.0, dur - vd - 0.2) * SR))
+    for k in range(4):
+        st = t_axis(0.07)
+        squeak = sine_sweep(0.07, r.uniform(4200, 5600), r.uniform(2800, 3500)) * np.sin(np.pi * st / 0.07) ** 2 * 0.12
+        add_at(x, squeak, int(r.uniform(0.2, 2.2) * SR))
+    return fade(normalize(reverb(x, 1.4, 0.35), -5.0), 0.002, 0.3)
+
+
+def power_undercroft():
+    """Umbren Undercroft: a grate scrapes aside, air rushes down a shaft, water drips in the dark below."""
+    r = rng(352)
+    dur = 3.0
+    tt = t_axis(dur)
+    n = len(tt)
+    x = np.zeros(n)
+    scrape = band(r.standard_normal(n), 180, 1400) * (0.6 + 0.4 * np.abs(np.sin(TAU * 23 * tt))) * _gauss(tt, 0.25, 0.18) * 0.6
+    x += scrape
+    for i, (lo, hi) in enumerate([(1500, 4000), (700, 2000), (250, 900), (80, 300)]):    # falling rush of air
+        x += band(r.standard_normal(n), lo, hi) * _gauss(tt, 0.55 + 0.2 * i, 0.22) * 0.3
+    bt = t_axis(dur - 1.2)
+    add_at(x, sine_sweep(dur - 1.2, 60, 32) * np.exp(-bt / 0.4) * np.minimum(1, bt / 0.01) * 0.7, int(1.2 * SR))
+    for k in range(5):
+        add_at(x, resonator(0.25, r.uniform(1400, 2600), 0.03) * r.uniform(0.1, 0.22), int(r.uniform(1.4, 2.7) * SR))
+    return fade(normalize(reverb(x, 2.8, 0.45, damp=4000), -3.0), 0.002, 0.4)
+
+
+def growl(seconds, f0, f1, r, rough=26.0):
+    """A throaty animal growl: a buzzing harmonic tone, rattled and breathy."""
+    tt = t_axis(seconds)
+    f = f0 * (f1 / f0) ** (tt / seconds)
+    ph = np.cumsum(TAU * f / SR)
+    tone = sum(np.sin(k * ph) / k for k in range(1, 12))
+    rattle = 0.55 + 0.45 * np.abs(np.sin(TAU * rough * tt + 0.6 * np.sin(TAU * 3.1 * tt)))
+    breath = band(r.standard_normal(len(tt)), 300, 2500) * 0.35
+    return np.tanh(1.6 * (tone * 0.5 + breath) * rattle)
+
+
+def power_pounce():
+    """Varga Pounce: a rising rush, a heavy landing and a snarl."""
+    r = rng(353)
+    dur = 1.1
+    tt = t_axis(dur)
+    n = len(tt)
+    x = np.zeros(n)
+    for i, (lo, hi) in enumerate([(300, 900), (800, 2200), (2000, 5000)]):              # rising leap
+        x += band(r.standard_normal(n), lo, hi) * _gauss(tt, 0.08 + 0.07 * i, 0.07) * 0.35
+    lt = t_axis(dur - 0.27)
+    land = sine_sweep(dur - 0.27, 120, 42) * np.exp(-lt / 0.1) * np.minimum(1, lt / 0.003) * 0.9
+    land += band(r.standard_normal(len(lt)), 100, 2500) * np.exp(-lt / 0.025) * 0.6
+    add_at(x, land, int(0.27 * SR))
+    gt = t_axis(0.5)
+    add_at(x, growl(0.5, 95, 80, r) * np.sin(np.pi * gt / 0.5) ** 1.5 * 0.35, int(0.38 * SR))
+    return fade(normalize(reverb(x, 0.9, 0.18), -2.0), 0.002, 0.08)
+
+
+def howl(seconds, base, r):
+    """One long howl: a rising glide, a wavering hold and a falling tail."""
+    tt = t_axis(seconds)
+    k = tt / seconds
+    rise = np.clip(k / 0.3, 0, 1)
+    fall = np.clip((k - 0.72) / 0.28, 0, 1)
+    f = base * (0.6 + 0.4 * (1 - (1 - rise) ** 2)) * (1 + 0.04 * k) * (1 - 0.3 * fall ** 1.5)
+    f *= 1 + 0.012 * np.sin(TAU * 5.4 * tt) * np.clip((k - 0.25) / 0.2, 0, 1)
+    ph = np.cumsum(TAU * f / SR)
+    tone = np.sin(ph) + 0.35 * np.sin(2 * ph) + 0.12 * np.sin(3 * ph) + 0.05 * np.sin(4 * ph)
+    env = np.minimum(1, k / 0.12) * (1 - fall ** 2)
+    breath = band(r.standard_normal(len(tt)), 500, 3000) * 0.08
+    return (tone + breath) * env
+
+
+def power_howl():
+    """Varga Pack Howl: a long howl, answered by the strays of the district."""
+    r = rng(354)
+    dur = 5.0
+    n = int(dur * SR)
+    x = np.zeros(n)
+    add_at(x, howl(2.4, 520, r) * 0.8, 0)
+    for t0, base, amp in [(1.5, 470, 0.32), (2.2, 585, 0.26), (2.7, 430, 0.2)]:
+        add_at(x, band(howl(1.9, base, r), 200, 2200) * amp, int(t0 * SR))
+    return fade(normalize(reverb(x, 3.2, 0.45, damp=4500), -2.0), 0.003, 0.6)
+
+
+def power_unchained():
+    """Varga Unchained: a heartbeat slams, then a roar climbs out of the chest."""
+    r = rng(355)
+    dur = 1.9
+    tt = t_axis(dur)
+    x = np.zeros(len(tt))
+    bt = t_axis(0.3)
+    add_at(x, np.sin(TAU * 52 * bt * (1 - 0.3 * bt)) * np.exp(-bt / 0.08) * np.minimum(1, bt / 0.006) * 0.9, 0)
+    gt = t_axis(1.5)
+    roar = growl(1.5, 85, 150, r, rough=31.0) * np.minimum(1, gt / 0.35) * np.exp(-np.maximum(gt - 0.9, 0) / 0.25)
+    add_at(x, roar * 0.6, int(0.25 * SR))
+    return fade(normalize(reverb(x, 1.2, 0.22), -2.0), 0.002, 0.15)
+
+
 def torpor():
     r = rng(320)
     dur = 3.0
@@ -689,6 +816,12 @@ def main():
     save('power_crimson_mist', power_crimson_mist())
     save('power_majesty', power_majesty())
     save('power_dominate', power_dominate())
+    save('power_shroud', power_shroud())
+    save('power_whispers', power_whispers())
+    save('power_undercroft', power_undercroft())
+    save('power_pounce', power_pounce())
+    save('power_howl', power_howl())
+    save('power_unchained', power_unchained())
     save('sfx_torpor', torpor())
     save('sfx_embrace', embrace())
     save('sting_danger', sting_danger())

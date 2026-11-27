@@ -348,6 +348,7 @@ namespace Sanguine.Server
             float m = 1f;
             if (_now < p.SurgeUntil) m *= GameRules.SurgeSpeedMultiplier;
             if (_now < p.MistUntil) m *= 1.3f;
+            if (_now < p.EmboldenedUntil) m *= GameRules.EmboldenedSpeedMultiplier;
             if (_now < p.SlowUntil) m *= GameRules.SlowSpeedMultiplier;
             return m;
         }
@@ -366,6 +367,8 @@ namespace Sanguine.Server
                 // Moving away breaks the feeding embrace.
                 if (Entity.Dist(p.FeedStartX, p.FeedStartZ, x, z) > 1.0f) StopFeeding(p, true);
             }
+
+            if (p.UndercroftAt > 0 && Entity.Dist(p.UndercroftX, p.UndercroftZ, x, z) > 1.0f) CancelUndercroft(p, "you moved");
 
             float allowed = (float)(GameRules.WalkSpeed * SpeedMultiplier(p) * 1.35 * Math.Min(elapsed + 0.1, 1.0)) + 0.3f;
             // Reject speed hacks and walking through walls (solids shrunk slightly: the client's capsule
@@ -394,9 +397,17 @@ namespace Sanguine.Server
             foreach (var p in _players)
             {
                 _scratchStates.Clear();
+                bool whispers = _now < p.WhispersUntil;
+                float playerRadius = whispers ? GameData.GetGift(GiftId.Whispers).Range : GameRules.InterestRadius;
                 foreach (var e in _entities.Values)
                 {
-                    if (e != p && Entity.Dist(e.X, e.Z, p.X, p.Z) > GameRules.InterestRadius) continue;
+                    if (e != p)
+                    {
+                        float d = Entity.Dist(e.X, e.Z, p.X, p.Z);
+                        var pe = e as PlayerEntity;
+                        if (d > (pe != null ? playerRadius : GameRules.InterestRadius)) continue;
+                        if (pe != null && !CanSee(p, pe, d)) continue;
+                    }
                     if (!p.Known.Contains(e.Id))
                     {
                         p.Known.Add(e.Id);
@@ -439,6 +450,8 @@ namespace Sanguine.Server
                 if (_now < p.MistUntil) f |= EntityFlags.Mist;
                 if (_now < p.IronSkinUntil) f |= EntityFlags.IronSkin;
                 if (_now < p.MajestyUntil) f |= EntityFlags.Majesty;
+                if (_now < p.ShroudUntil) f |= EntityFlags.Shrouded;
+                if (_now < p.UnchainedUntil) f |= EntityFlags.Unchained;
             }
             var m = e as Mortal;
             if (m != null)
@@ -482,6 +495,11 @@ namespace Sanguine.Server
             if (_now < p.MajestyUntil) f |= SelfFlags.Majesty;
             if (_now < p.SilencedUntil) f |= SelfFlags.Silenced;
             if (p.Bonded) f |= SelfFlags.Bonded;
+            if (_now < p.ShroudUntil) f |= SelfFlags.Shroud;
+            if (_now < p.WhispersUntil) f |= SelfFlags.Whispers;
+            if (p.UndercroftAt > 0) f |= SelfFlags.Undercroft;
+            if (_now < p.EmboldenedUntil) f |= SelfFlags.Emboldened;
+            if (_now < p.UnchainedUntil) f |= SelfFlags.Unchained;
             m.Flags = f;
             m.Bloodline = p.Profile.Bloodline;
             m.LearnedGifts = (byte)(p.Profile.Gifts | 1);

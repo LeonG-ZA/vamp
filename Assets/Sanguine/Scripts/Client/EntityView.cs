@@ -144,7 +144,8 @@ namespace Sanguine.Client
             bool feeding = (Flags & EntityFlags.Feeding) != 0 && Kind == EntityKind.Player;
             _visual.SetMotion(down ? 0f : _speed, feeding, down);
             if (_aura != null)
-                _aura.Show((Flags & EntityFlags.Mist) != 0, (Flags & EntityFlags.Majesty) != 0, (Flags & EntityFlags.IronSkin) != 0);
+                _aura.Show((Flags & EntityFlags.Mist) != 0, (Flags & EntityFlags.Majesty) != 0, (Flags & EntityFlags.IronSkin) != 0,
+                           (Flags & EntityFlags.Shrouded) != 0, (Flags & EntityFlags.Unchained) != 0);
 
             _bloodPool.SetActive(down && Kind != EntityKind.Player);
             if (_crown != null) _crown.SetActive((Flags & EntityFlags.Regent) != 0);

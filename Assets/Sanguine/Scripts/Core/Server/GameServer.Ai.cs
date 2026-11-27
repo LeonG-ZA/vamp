@@ -133,7 +133,8 @@ namespace Sanguine.Server
                         // Mortals sense the Beast in those who have lost their conscience.
                         foreach (var p in _players)
                         {
-                            if (!p.InTorpor && p.Conscience <= GameRules.ConscienceBeastThreshold && _now >= p.GlamourUntil && p.DistanceTo(m) < 8f)
+                            bool beast = p.Conscience <= GameRules.ConscienceBeastThreshold || _now < p.UnchainedUntil;
+                            if (!p.InTorpor && beast && _now >= p.GlamourUntil && _now >= p.ShroudUntil && p.DistanceTo(m) < 8f)
                             { Alarm(m, p.X, p.Z); break; }
                         }
                         if (m.Mode != MortalMode.Walking) break;
@@ -199,7 +200,7 @@ namespace Sanguine.Server
 
         private void MaybeSpawnHunters(PlayerEntity p)
         {
-            if (p.InTorpor || p.Exposure < GameRules.ExposureHunterThreshold || _now < p.MistUntil) return;
+            if (p.InTorpor || p.Exposure < GameRules.ExposureHunterThreshold || _now < p.MistUntil || _now < p.ShroudUntil) return;
             if (ZoneKindAt(p.X, p.Z) != ZoneKind.None) return;
             int desired = p.Exposure >= GameRules.ExposureMarkedThreshold ? 3 : 1;
             if (HuntersOn(p) >= desired) return;
@@ -253,11 +254,18 @@ namespace Sanguine.Server
                     if (_now - h.LostTargetSince > 15) { RemoveHunter(h); continue; }
                     continue;
                 }
+                float dist = h.DistanceTo(target);
+                if (_now < target.ShroudUntil && dist > GameRules.ShroudHunterRange)
+                {
+                    // The quarry has melted into the shadows: the hunter searches, then gives up.
+                    if (h.LostTargetSince < 0) h.LostTargetSince = _now;
+                    if (_now - h.LostTargetSince > 6) RemoveHunter(h);
+                    continue;
+                }
                 h.LostTargetSince = -1;
 
                 if (h.IsStunned(_now)) continue;
 
-                float dist = h.DistanceTo(target);
                 if (_now < target.MajestyUntil && dist < 6.5f)
                 {
                     // Awed by Majesty: the hunter keeps its distance and does not strike.

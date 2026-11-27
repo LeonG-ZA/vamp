@@ -20,6 +20,7 @@ public static class ExportScene
     public static int Main(string[] args)
     {
         string outPath = args.Length > 0 ? args[0] : "scene.json";
+        int rank = args.Length > 1 ? int.Parse(args[1], CultureInfo.InvariantCulture) : 0;   // 0 = best spot, 1 = runner-up, ...
         string save = Path.Combine(Path.GetTempPath(), "sanguine-preview-" + Guid.NewGuid().ToString("N"));
         var cfg = new ServerConfig { Port = 0, SaveDirectory = save, DebugCommands = true, SimSeed = 11, MortalsPerDistrict = 60, Log = m => { } };
         var server = new GameServer(cfg);
@@ -33,11 +34,10 @@ public static class ExportScene
         sel.Say("/circle create Velvet Knives");
         Thread.Sleep(1100);
 
-        // Prefer a calm mortal in Midtown close to club neon.
+        // Prefer a calm mortal in Midtown close to club neon, away from the city's edge, with a few witnesses around.
         var neon = new List<BoxPiece>();
         foreach (BoxPiece b in dressing.Boxes) if (b.Material == SurfaceNames.Glow && b.Emission >= 3f) neon.Add(b);
-        EntityState target = default(EntityState);
-        float bestScore = float.MaxValue;
+        var scores = new Dictionary<int, KeyValuePair<float, EntityState>>();
         for (int sweep = 0; sweep < 9; sweep++)
         {
             float tx = 25 + 50 * (sweep % 3), tz = 25 + 50 * (sweep / 3);
@@ -46,12 +46,27 @@ public static class ExportScene
             foreach (EntityState e in sel.Entities)
             {
                 if (e.Kind != EntityKind.Mortal || e.Flags != EntityFlags.None || GameData.DistrictAt(e.X, e.Z) != 1) continue;
+                if (Math.Abs(e.X) > 170f || Math.Abs(e.Z) > 170f) continue;
                 float score = 1000f;
                 foreach (BoxPiece n in neon) score = Math.Min(score, Entity.Dist(e.X, e.Z, n.CX, n.CZ));
-                if (score < bestScore) { bestScore = score; target = e; }
+                int witnesses = 0;
+                foreach (EntityState o in sel.Entities)
+                    if (o.Kind == EntityKind.Mortal && o.Id != e.Id && Entity.Dist(o.X, o.Z, e.X, e.Z) < 13f) witnesses++;
+                // Neon a few metres away lights the scene; right beside the victim it blows the shot out.
+                score = Math.Abs(score - 5f) + 5f * Math.Max(0, 3 - witnesses);
+                KeyValuePair<float, EntityState> prev;
+                if (!scores.TryGetValue(e.Id, out prev) || score < prev.Key) scores[e.Id] = new KeyValuePair<float, EntityState>(score, e);
             }
         }
-        Console.WriteLine("target mortal " + target.Id + " at " + F(target.X) + "," + F(target.Z) + " (" + F(bestScore) + " m from neon)");
+        var ranked = new List<KeyValuePair<float, EntityState>>(scores.Values);
+        ranked.Sort((a, b) => a.Key.CompareTo(b.Key));
+        // Skip candidates standing within 20 m of a better one, so each rank is a different spot.
+        var spots = new List<KeyValuePair<float, EntityState>>();
+        foreach (var c in ranked)
+            if (!spots.Exists(o => Entity.Dist(o.Value.X, o.Value.Z, c.Value.X, c.Value.Z) < 20f)) spots.Add(c);
+        var pick = spots[Math.Min(rank, spots.Count - 1)];
+        EntityState target = pick.Value;
+        Console.WriteLine("target mortal " + target.Id + " at " + F(target.X) + "," + F(target.Z) + " (spot " + rank + " of " + spots.Count + ", score " + F(pick.Key) + ")");
 
         sel.Say("/setexposure 52");
         Thread.Sleep(1100);
@@ -59,6 +74,7 @@ public static class ExportScene
         for (int tries = 0; tries < 12 && !sel.Flag(SelfFlags.Feeding); tries++)
         {
             sel.Pump();
+            sel.Notices.Clear();   // only the successful attempt's notices end up on screen
             foreach (EntityState e in sel.Entities) if (e.Id == target.Id) target = e;
             // Approach from the street side so the camera sees the feeding against the facades.
             float dx = 0.9f, dz = 0.45f;

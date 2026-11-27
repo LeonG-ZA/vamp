@@ -253,7 +253,7 @@ lights.forEach(({ l }, i) => {
 });
 
 // ---------------------------------------------------------------- characters (port of ProceduralFigure)
-const bloodlines = [[0.75, 0.25, 0.18], [0.85, 0.35, 0.65], [0.45, 0.3, 0.8], [0.9, 0.75, 0.3]];
+const bloodlines = [[0.75, 0.25, 0.18], [0.85, 0.35, 0.65], [0.45, 0.3, 0.8], [0.9, 0.75, 0.3], [0.3, 0.62, 0.66], [0.47, 0.68, 0.3]];
 const G = { cap: new THREE.CapsuleGeometry(0.5, 1, 6, 12), sph: new THREE.SphereGeometry(0.5, 20, 14), cyl: new THREE.CylinderGeometry(0.5, 0.5, 2, 16), cube: new THREE.BoxGeometry(1, 1, 1) };
 const flat = {}; const fm = (c, s = 0.25, em = false) => { const k = c.getHexString() + s + em; if (!flat[k]) flat[k] = new THREE.MeshStandardMaterial({ color: c, roughness: 1 - s, emissive: em ? c : 0x000000, emissiveIntensity: em ? 2 : 0, envMapIntensity: ENV_NIGHT }); return flat[k]; };
 function prim(geo, parent, pos, scale, c, s, em) { const m = new THREE.Mesh(G[geo], fm(c, s, em)); m.position.set(pos[0], pos[1], -pos[2]); m.scale.set(...scale); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; }
@@ -348,9 +348,9 @@ for (const e of views) {
 }
 const s = S.self, w = S.world;
 const bar = (x, y, wd, h, v, max, color, text) => el(`<div style="position:absolute;left:1px;top:1px;height:${h - 2}px;width:${(wd - 2) * Math.max(0, Math.min(1, v / max))}px;background:${color}"></div><div style="position:absolute;width:100%;top:0;line-height:${h}px;text-align:center">${text}</div>`, `left:${x}px;top:${y}px;width:${wd}px;height:${h}px;background:rgba(0,0,0,.6)`);
-el('', 'left:10px;top:10px;width:290px;height:230px;background:rgba(0,0,0,.5)');
-el(`<b>${me.name}</b>&nbsp; <span style="color:${hex(col(...bloodlines[me.bloodline]))}">Sylphine</span><div style="font-size:12px;margin-top:3px">Midtown</div>`, 'left:18px;top:16px;width:274px');
-const y0 = 62;
+el('', 'left:10px;top:10px;width:290px;height:248px;background:rgba(0,0,0,.5)');
+el(`<b>${me.name}</b>&nbsp; <span style="color:${hex(col(...bloodlines[me.bloodline]))}">Sylphine</span><div style="font-size:12px;margin-top:3px">Midtown</div><div style="font-size:12px;margin-top:3px"><span style="color:#ffd080">Fledgling</span> <span style="color:#999">(L: lineage)</span></div>`, 'left:18px;top:16px;width:274px');
+const y0 = 80;
 bar(18, y0, 274, 18, s.blood, s.maxBlood, 'rgb(166,5,13)', `Blood ${s.blood.toFixed(1)} / ${s.maxBlood}`);
 bar(18, y0 + 22, 274, 18, s.health, s.maxHealth, 'rgb(64,128,77)', `Health ${Math.ceil(s.health)} / ${s.maxHealth}`);
 bar(18, y0 + 44, 274, 18, s.exposure, 100, s.exposure >= 80 ? 'red' : s.exposure >= 50 ? 'rgb(255,140,0)' : 'rgb(179,153,51)', `Exposure ${Math.round(s.exposure)}%`);
@@ -366,14 +366,15 @@ el(`<b>Districts</b><br>${dn.map((n, i) => `${i + 1}. ${n}: ${w.controllers[i] ?
 if (tgt) { el(`<div style="text-align:center;margin-top:3px"><b>${tgt.name}</b> (Mortal) ${Math.hypot(tgt.x - me.x, tgt.z - me.z).toFixed(1)}m</div>`, `left:${W / 2 - 160}px;top:80px;width:320px;height:54px;background:rgba(0,0,0,.5)`); bar(W / 2 - 150, 108, 300, 16, tgt.hp, 255, 'rgb(179,26,26)', ''); }
 const levelColor = n => /MARKED|hunter/i.test(n) ? 'rgb(255,77,77)' : 'rgb(242,242,242)';
 S.notices.slice(-3).forEach((n, i) => el(n, `left:0;top:${H * 0.28 + i * 26}px;width:${W}px;text-align:center;font:bold 18px Arial;color:${levelColor(n)};text-shadow:1px 1px 0 #000`));
-// Action bar (ClientUI.DrawActionBar): feed, strike, the bloodline's three gifts, gifts panel, thralls, help.
+// Action bar (ClientUI.DrawActionBar): feed, strike, the bloodline's three gifts, gifts, thralls, lineage, help.
 const GIFTS = [[['Surge', 2, 0], ['Iron Skin', 2, 5], ['Earthshaker', 3, 12]], [['Allure', 1, 0], ['Glamour', 2, 5], ['Rapture', 3, 12]],
-               [['Blood Lash', 2, 0], ['Siphon', 1, 5], ['Crimson Mist', 3, 12]], [['Command', 2, 0], ['Majesty', 2, 5], ['Dominate', 3, 12]]][me.bloodline];
+               [['Blood Lash', 2, 0], ['Siphon', 1, 5], ['Crimson Mist', 3, 12]], [['Command', 2, 0], ['Majesty', 2, 5], ['Dominate', 3, 12]],
+               [['Shroud', 2, 0], ['Whispers', 2, 5], ['Undercroft', 3, 12]], [['Pounce', 2, 0], ['Pack Howl', 2, 5], ['Unchained', 3, 12]]][me.bloodline];
 const learned = S.self.gifts || 1;
 const bar8 = ['[F] Release', '[1] Strike',
   ...GIFTS.map((g, i) => `[${i + 2}] ${g[0]}<br><span style="font-size:10px">${(learned >> i) & 1 ? g[1] + ' blood' : '<span style="color:#ff9060">locked: ' + g[2] + ' standing</span>'}</span>`),
-  '[G] Gifts', '[T] Thralls', '[H] Help'];
-bar8.forEach((b, i) => el(`<div class="btn">${b}</div>`, `left:${W / 2 - (112 * 8 + 6 * 7) / 2 + i * 118}px;top:${H - 58}px;width:112px;height:48px`));
+  '[G] Gifts', '[T] Thralls', '[L] Lineage', '[H] Help'];
+bar8.forEach((b, i) => el(`<div class="btn">${b}</div>`, `left:${W / 2 - (104 * 9 + 5 * 8) / 2 + i * 109}px;top:${H - 58}px;width:104px;height:48px`));
 el('', `left:10px;top:${H - 300}px;width:460px;height:220px;background:rgba(0,0,0,.35)`);
 el(S.chat.slice(-11).map(c => { const m = c.match(/^([A-Za-z0-9_]+): (.*)$/); return m ? `<span style="color:#e0e0e0"><b>${m[1]}</b>: ${m[2]}</span>` : `<span style="color:#c0a0ff">${c.replace(/</g, '&lt;')}</span>`; }).join('<br>'), `left:16px;top:${H - 296}px;width:448px;font-size:12px;line-height:16px`);
 el('<span style="color:#999">Press Enter to chat. /help for commands.</span>', `left:10px;top:${H - 76}px;font-size:12px`);

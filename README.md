@@ -6,18 +6,20 @@ mechanic, feeding on humans and ghoul-style minion missions. The setting and rul
 
 ![Sanguine City preview](Docs/screenshot-preview.png)
 
-*Preview: Selene feeds on a cab driver outside a Midtown club. Fleeing witnesses have pushed her exposure to 84%, so she's MARKED, and a hunter has picked up her trail. The game state and the city layout come from the real server and the shared `CityDressing` code, and the image uses the game's own art. It is a browser re-creation (three.js), not a Unity render, so lighting is approximate. Characters are shown with the built-in fallback figure (see [Characters](#characters)).*
+*Preview: Selene, a Sylphine fledgling, feeds on a reporter under a Midtown street lamp. Witnesses have pushed her exposure to 78%, and a hunter (right) has picked up her trail. The game state and the city layout come from the real server and the shared `CityDressing` code, and the image uses the game's own art. It is a browser re-creation (three.js), not a Unity render, so lighting is approximate. Characters are shown with the built-in fallback figure (see [Characters](#characters)).*
 
 - **[Docs/RESEARCH.md](Docs/RESEARCH.md)**: what design material exists for the cancelled game, what it says, and sources.
 - **[Docs/DESIGN.md](Docs/DESIGN.md)**: the game design document for Sanguine City.
 
 ## Features
 
-- **Four bloodlines with three gifts each.** The first is innate; the other two are learned by spending standing, which also weights your Regent vote.
+- **Six bloodlines with three gifts each.** The first is innate; the other two are learned by spending standing, which also weights your Regent vote.
   - **Vorlen:** Surge, Iron Skin, Earthshaker.
   - **Sylphine:** Allure, Glamour, Rapture.
   - **Ashborn:** Blood Lash, Siphon, Crimson Mist.
   - **Aurum:** Command, Majesty, Dominate.
+  - **Umbren** (spies): Shroud (unseen beyond 6 m), Whispers (sense every vampire within 150 m), Undercroft (tunnel home to the haven).
+  - **Varga** (feral pack): Pounce (leap onto a target), Pack Howl (cow hunters, speed up allies), Unchained (fast strikes that heal).
   The full table is in [DESIGN.md](Docs/DESIGN.md#4-bloodlines-and-gifts).
 - **Sires and childer.** A fledgling can accept the Embrace from an elder and is remade in the sire's bloodline.
   - The sire teaches gifts for less standing and answers for the childe's crimes until releasing them.
@@ -45,7 +47,7 @@ mechanic, feeding on humans and ghoul-style minion missions. The setting and rul
   - night-city and daytime ambience, rain on the wet streets and a dark ambient score;
   - fire barrels crackle and neon buzzes where they stand;
   - footsteps change between wet asphalt, pavement and cobbles;
-  - feeding has a bite and a quickening heartbeat, and strikes, each bloodline's gift, torpor, sunlight, danger and the dawn bell all have cues;
+  - feeding has a bite and a quickening heartbeat, and strikes, all 18 gifts (down to the Varga howl and its answering strays), torpor, sunlight, danger and the dawn bell all have cues;
   - in the Embrace, the fledgling's racing heart slows until it beats as one with the sire's;
   - havens and sanctums muffle the street noise.
 - **Still runs without any art:** if the art or packages are missing, the game falls back to flat colours and simple shapes. Open the project and press Play.
@@ -86,7 +88,7 @@ The script:
 All sounds are original and synthesised by `Tools/audio/synth_audio.py` (numpy + ffmpeg/libvorbis), so they carry no third-party license:
 
 ```bash
-python3 Tools/audio/synth_audio.py      # writes 41 Ogg Vorbis files (~2.3 MB) to Assets/Sanguine/Resources/Audio
+python3 Tools/audio/synth_audio.py      # writes 47 Ogg Vorbis files (~2.4 MB) to Assets/Sanguine/Resources/Audio
 ```
 
 Loops are built with circular processing, so they repeat without clicks. `AudioDirector` drives everything from the state the client already receives, so no gameplay code calls into audio. Master and music volume are set in the main menu.
@@ -103,7 +105,7 @@ The repository doesn't ship realistic human models yet. None of the CC0 sources 
 
 ## Preview screenshots without Unity
 
-`Tools/preview/make_preview.sh` produces a screenshot like the one above. It:
+`Tools/preview/make_preview.sh` produces a screenshot like the one above (see [Tools/preview/README.md](Tools/preview/README.md) for the exact command). It:
 1. runs the real server and scripts a short scene with bot players;
 2. exports the live state and the full `CityDressing`;
 3. renders that with three.js in headless Chromium, using the same art.
@@ -155,10 +157,11 @@ Server options: `--port --seed --save --night --day --mortals --max-players --de
 - collision with buildings and hunters routing around them along the streets;
 - learning gifts with standing and the main gift effects (Siphon, Iron Skin, Dominate, Majesty, Crimson Mist);
 - the Embrace and lineage: offers, the bloodline change, the blood bond, lineage chat, kin protection, taught gifts, a sire's shame, release and renouncing;
+- the Umbren and Varga gifts (Shroud hiding and breaking, Whispers, the Undercroft trip home, Pounce, Pack Howl, Unchained immunity);
 - persistence across a server restart.
 
 ```bash
-Server/build.sh && mono Server/bin/SanguineTests.exe     # 83 passed, 0 failed
+Server/build.sh && mono Server/bin/SanguineTests.exe     # 99 passed, 0 failed
 ```
 
 ## Project layout

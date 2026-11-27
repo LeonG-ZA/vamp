@@ -109,7 +109,7 @@ namespace Sanguine.Client
 
         private void DrawMenu()
         {
-            float w = 720, h = 560;
+            float w = 860, h = 580;
             Rect area = new Rect((Screen.width - w) / 2, (Screen.height - h) / 2, w, h);
             Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(0, 0, 0, 0.55f));
             GUILayout.BeginArea(area, _box);
@@ -291,6 +291,11 @@ namespace Sanguine.Client
             AddFlag(flags, s.Flags, SelfFlags.Majesty, "Majesty", "ffd860");
             AddFlag(flags, s.Flags, SelfFlags.Silenced, "SILENCED", "a0a0ff");
             AddFlag(flags, s.Flags, SelfFlags.Bonded, "Blood bond", "ff90a8");
+            AddFlag(flags, s.Flags, SelfFlags.Shroud, "Shrouded", "70c0c8");
+            AddFlag(flags, s.Flags, SelfFlags.Whispers, "Whispers", "90e0e0");
+            AddFlag(flags, s.Flags, SelfFlags.Undercroft, "Slipping into the Undercroft", "70c0c8");
+            AddFlag(flags, s.Flags, SelfFlags.Emboldened, "Emboldened", "b0e080");
+            AddFlag(flags, s.Flags, SelfFlags.Unchained, "UNCHAINED", "ff8040");
             GUI.Label(new Rect(panel.x + 8, y + 108, 274, 60), flags.ToString(), _small);
         }
 
@@ -353,6 +358,8 @@ namespace Sanguine.Client
             if ((t.Flags & EntityFlags.Marked) != 0) fl.Append(" <color=#ff4040>MARKED</color>");
             if ((t.Flags & EntityFlags.Stunned) != 0) fl.Append(" stunned");
             if ((t.Flags & EntityFlags.Down) != 0) fl.Append(" down");
+            if ((t.Flags & EntityFlags.Shrouded) != 0) fl.Append(" <color=#70c0c8>shrouded</color>");
+            if ((t.Flags & EntityFlags.Unchained) != 0) fl.Append(" <color=#ff8040>unchained</color>");
             string tkin = Client.KinOf(t);
             if (tkin.Length > 0) fl.Append(" <color=#ff90a8>").Append(tkin).Append("</color>");
             else if (t.Kind == EntityKind.Player && !string.IsNullOrEmpty(t.Info.Sire)) fl.Append(" childe of ").Append(Escape(t.Info.Sire));

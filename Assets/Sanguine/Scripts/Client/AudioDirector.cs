@@ -272,6 +272,12 @@ namespace Sanguine.Client
                 case GiftId.CrimsonMist: return "power_crimson_mist";
                 case GiftId.Command: return "power_command";
                 case GiftId.Majesty: return "power_majesty";
+                case GiftId.Shroud: return "power_shroud";
+                case GiftId.Whispers: return "power_whispers";
+                case GiftId.Undercroft: return "power_undercroft";
+                case GiftId.Pounce: return "power_pounce";
+                case GiftId.PackHowl: return "power_howl";
+                case GiftId.Unchained: return "power_unchained";
                 default: return "power_dominate";
             }
         }

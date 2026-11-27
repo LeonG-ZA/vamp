@@ -157,7 +157,7 @@ namespace Sanguine.Server
                 {
                     p.NextStarve = _now + GameRules.StarvingDamageInterval;
                     Notice(p, NoticeLevel.Danger, "The Hunger gnaws at you. Feed!");
-                    Damage(p, 1f, null);
+                    Damage(p, 1f, null, true);
                     if (p.InTorpor) continue;
                 }
 
@@ -167,7 +167,7 @@ namespace Sanguine.Server
                 {
                     p.NextSun = _now + 2.0;
                     Notice(p, NoticeLevel.Danger, "The sun sears your flesh!");
-                    Damage(p, 1f, null);
+                    Damage(p, 1f, null, true);
                     if (p.InTorpor) continue;
                 }
 
@@ -180,6 +180,18 @@ namespace Sanguine.Server
                 }
 
                 UpdateFeeding(p, dt);
+
+                // Undercroft: the channel completes and the tunnels carry you home.
+                if (p.UndercroftAt > 0 && _now >= p.UndercroftAt)
+                {
+                    p.UndercroftAt = 0;
+                    float hx, hz;
+                    CityLayout.SpawnPoint(_city.HavenFor(p.Profile.Bloodline), out hx, out hz);
+                    TeleportPlayer(p, hx, hz);
+                    p.LastMoveTime = _now;
+                    foreach (Hunter h in _hunters) if (h.TargetPlayer == p.Id) h.TargetPlayer = 0;
+                    Notice(p, NoticeLevel.Good, "You climb out of the Undercroft into your haven.");
+                }
 
                 // The Hush: exposure attracts hunters.
                 if (_now >= p.NextHunterCheck)
@@ -198,6 +210,7 @@ namespace Sanguine.Server
             p.Exposure = 0;
             p.SurgeUntil = p.SlowUntil = p.RootUntil = 0;
             p.IronSkinUntil = p.GlamourUntil = p.MistUntil = p.MajestyUntil = p.SilencedUntil = 0;
+            p.ShroudUntil = p.WhispersUntil = p.EmboldenedUntil = p.UnchainedUntil = p.UndercroftAt = 0;
             float x, z;
             CityLayout.SpawnPoint(_city.HavenFor(p.Profile.Bloodline), out x, out z);
             TeleportPlayer(p, x, z);
@@ -256,6 +269,7 @@ namespace Sanguine.Server
         {
             if (p.InTorpor || p.FeedTarget != 0) return;
             if (_now < p.MistUntil) { Notice(p, NoticeLevel.Info, "You have no lips while you are mist."); return; }
+            if (_now < p.UnchainedUntil) { Notice(p, NoticeLevel.Info, "The unchained beast tears; it cannot feed gently."); return; }
             var m = Get<Mortal>(targetId);
             if (m == null || m.Mode == MortalMode.Dead) { Notice(p, NoticeLevel.Info, "No living vessel there."); return; }
             if (p.DistanceTo(m) > GameRules.FeedRange) { Notice(p, NoticeLevel.Info, "Get closer to feed."); return; }
@@ -264,6 +278,8 @@ namespace Sanguine.Server
             if (m.FedUponBy != 0) { Notice(p, NoticeLevel.Info, "Another Kindred is already feeding there."); return; }
             if (p.Blood >= p.MaxBlood) { Notice(p, NoticeLevel.Info, "You are sated."); return; }
 
+            BreakShroud(p);
+            CancelUndercroft(p, null);
             p.FeedTarget = m.Id;
             p.FeedStartX = p.X; p.FeedStartZ = p.Z;
             p.FedThisFeeding = 0;
@@ -346,6 +362,7 @@ namespace Sanguine.Server
             if (tp != null)
             {
                 if (_now < tp.MistUntil) return "Your blow passes through crimson mist.";
+                if (!CanSee(attacker, tp, attacker.DistanceTo(tp))) return "You cannot find them in the shadows.";
                 if (ZoneKindAt(tp.X, tp.Z) == ZoneKind.Haven) return "They are safe within a haven.";
                 if (ZoneKindAt(attacker.X, attacker.Z) == ZoneKind.Haven) return "You cannot attack from within a haven.";
                 if (SameCircle(attacker, tp)) return "They are of your circle.";
@@ -366,9 +383,13 @@ namespace Sanguine.Server
             if (p.DistanceTo(t) > GameRules.MeleeRange) { Notice(p, NoticeLevel.Info, "Out of reach."); return; }
             if (p.FeedTarget != 0) StopFeeding(p, false);
 
-            p.AttackReadyAt = _now + GameRules.MeleeCooldown;
+            bool unchained = _now < p.UnchainedUntil;
+            p.AttackReadyAt = _now + GameRules.MeleeCooldown * (unchained ? GameRules.UnchainedMeleeCooldown : 1f);
             p.LastCombat = _now;
+            BreakShroud(p);
+            CancelUndercroft(p, null);
             float dmg = p.Def.MeleeDamage * (_now < p.SurgeUntil ? 2f : 1f);
+            if (unchained) p.Health = Math.Min(p.MaxHealth, p.Health + GameRules.UnchainedHealPerStrike);
 
             if (t.Kind != EntityKind.Hunter)
             {
@@ -384,17 +405,20 @@ namespace Sanguine.Server
 
         private bool IsIronSkinned(PlayerEntity p) { return _now < p.IronSkinUntil; }
 
-        /// <summary>Crowd control on a vampire; Iron Skin shrugs it off.</summary>
+        private bool IsUnchained(PlayerEntity p) { return _now < p.UnchainedUntil; }
+
+        /// <summary>Crowd control on a vampire; Iron Skin and Unchained shrug it off.</summary>
         private bool Root(PlayerEntity p, float seconds, string by)
         {
             if (IsIronSkinned(p)) { Notice(p, NoticeLevel.Info, "Your iron flesh will not kneel to " + by + "."); return false; }
+            if (IsUnchained(p)) { Notice(p, NoticeLevel.Info, "The beast in you will not kneel to " + by + "."); return false; }
             p.RootUntil = Math.Max(p.RootUntil, _now + seconds);
             return true;
         }
 
         private bool Slow(PlayerEntity p, float seconds, string by)
         {
-            if (IsIronSkinned(p)) return false;
+            if (IsIronSkinned(p) || IsUnchained(p)) return false;
             p.SlowUntil = Math.Max(p.SlowUntil, _now + seconds);
             Notice(p, NoticeLevel.Warning, by + " clouds your limbs.");
             return true;
@@ -402,7 +426,7 @@ namespace Sanguine.Server
 
         private bool Stun(PlayerEntity p, float seconds)
         {
-            if (IsIronSkinned(p)) return false;
+            if (IsIronSkinned(p) || IsUnchained(p)) return false;
             p.StunnedUntil = Math.Max(p.StunnedUntil, _now + seconds);
             return true;
         }
@@ -432,15 +456,25 @@ namespace Sanguine.Server
                 if (err != null) { Notice(p, NoticeLevel.Info, err); return; }
                 if (p.DistanceTo(t) > gift.Range) { Notice(p, NoticeLevel.Info, "Out of range (" + gift.Range + "m)."); return; }
             }
-            if (ZoneKindAt(p.X, p.Z) == ZoneKind.Sanctum && (gift.Id == GiftId.Earthshaker || gift.Id == GiftId.Rapture))
+            if (ZoneKindAt(p.X, p.Z) == ZoneKind.Sanctum &&
+                (gift.Id == GiftId.Earthshaker || gift.Id == GiftId.Rapture || gift.Id == GiftId.PackHowl))
             {
                 Notice(p, NoticeLevel.Info, "Violence is forbidden in a sanctum.");
                 return;
             }
+            float landX = 0f, landZ = 0f;
+            if (gift.Id == GiftId.Pounce && !PounceLanding(p, t, out landX, out landZ))
+            {
+                Notice(p, NoticeLevel.Info, "No clear path to leap.");
+                return;
+            }
+            if (gift.Id == GiftId.Undercroft && p.UndercroftAt > 0) return;
 
             p.Blood -= gift.Cost;
             p.GiftReadyAt[slot] = _now + gift.Cooldown;
             p.LastCombat = _now;
+            if (gift.Id != GiftId.Shroud) BreakShroud(p);
+            if (gift.Id != GiftId.Undercroft) CancelUndercroft(p, null);
 
             // Rapture enthrals the crowd first, so the entranced do not count as witnesses.
             if (gift.Id == GiftId.Rapture) CastRapture(p, gift);
@@ -548,7 +582,162 @@ namespace Sanguine.Server
                 case GiftId.Dominate:
                     CastDominate(p, t, gift);
                     break;
+
+                case GiftId.Shroud:
+                    p.ShroudUntil = _now + gift.Duration;
+                    foreach (Hunter h in _hunters)
+                        if (h.TargetPlayer == p.Id && h.DistanceTo(p) > GameRules.ShroudHunterRange) h.LostTargetSince = _now;
+                    Notice(p, NoticeLevel.Good, "You fold the shadows around you.");
+                    break;
+
+                case GiftId.Whispers:
+                    CastWhispers(p, gift);
+                    break;
+
+                case GiftId.Undercroft:
+                    p.UndercroftAt = _now + gift.Duration;
+                    p.UndercroftX = p.X;
+                    p.UndercroftZ = p.Z;
+                    StopFeeding(p, false);
+                    Notice(p, NoticeLevel.Info, "You slip toward the tunnels below... stand still.");
+                    break;
+
+                case GiftId.Pounce:
+                    CastPounce(p, t, landX, landZ);
+                    break;
+
+                case GiftId.PackHowl:
+                    CastPackHowl(p, gift);
+                    break;
+
+                case GiftId.Unchained:
+                    p.UnchainedUntil = _now + gift.Duration;
+                    p.RootUntil = p.SlowUntil = p.StunnedUntil = 0;
+                    StopFeeding(p, false);
+                    foreach (Mortal m in _mortals)
+                        if (m.Mode != MortalMode.Dead && m.FedUponBy == 0 && p.DistanceTo(m) <= 12f) Alarm(m, p.X, p.Z);
+                    Notice(p, NoticeLevel.Good, "You let the beast off its chain!");
+                    break;
             }
+        }
+
+        // ------------------------------------------------------------------
+        // Umbren and Varga gifts
+        // ------------------------------------------------------------------
+
+        private bool IsShrouded(PlayerEntity p) { return _now < p.ShroudUntil; }
+
+        private void BreakShroud(PlayerEntity p)
+        {
+            if (!IsShrouded(p)) return;
+            p.ShroudUntil = 0;
+            Notice(p, NoticeLevel.Info, "The shadows fall away from you.");
+        }
+
+        private void CancelUndercroft(PlayerEntity p, string why)
+        {
+            if (p.UndercroftAt <= 0) return;
+            p.UndercroftAt = 0;
+            Notice(p, NoticeLevel.Warning, "The tunnels close" + (why != null ? ": " + why : "."));
+        }
+
+        /// <summary>Whether the viewer can see (and target) another vampire: Shroud hides from rivals beyond arm's reach.</summary>
+        private bool CanSee(PlayerEntity viewer, PlayerEntity other, float dist)
+        {
+            if (!IsShrouded(other) || viewer == other) return true;
+            return dist <= GameRules.ShroudRevealRange || SameCircle(viewer, other) || IsDirectKin(viewer, other) || _now < viewer.WhispersUntil;
+        }
+
+        private static string Compass(float dx, float dz)
+        {
+            string[] dirs = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+            double a = Math.Atan2(dx, dz) * 180.0 / Math.PI;
+            int i = (int)Math.Round(((a % 360) + 360) % 360 / 45.0) % 8;
+            return dirs[i];
+        }
+
+        private void CastWhispers(PlayerEntity p, GiftDef gift)
+        {
+            p.WhispersUntil = _now + gift.Duration;
+            var near = new List<PlayerEntity>();
+            foreach (PlayerEntity o in _players) if (o != p && p.DistanceTo(o) <= gift.Range) near.Add(o);
+            near.Sort((a, b) => p.DistanceTo(a).CompareTo(p.DistanceTo(b)));
+            if (near.Count == 0) { Notice(p, NoticeLevel.Info, "Whispers: no Kindred stir within " + gift.Range + "m."); return; }
+            var parts = new List<string>();
+            for (int i = 0; i < near.Count && i < 3; i++)
+            {
+                PlayerEntity o = near[i];
+                parts.Add(o.Name + " " + Math.Round(p.DistanceTo(o)) + "m " + Compass(o.X - p.X, o.Z - p.Z) +
+                          (IsMarked(o) ? " (marked)" : "") + (o.InTorpor ? " (torpor)" : ""));
+            }
+            Notice(p, NoticeLevel.Good, "Whispers: " + string.Join(", ", parts.ToArray()) + (near.Count > 3 ? " and " + (near.Count - 3) + " more" : "") + ".");
+        }
+
+        /// <summary>Where a pounce lands: beside the target, on the side it came from, if the way is clear.</summary>
+        private bool PounceLanding(PlayerEntity p, Entity t, out float x, out float z)
+        {
+            x = p.X; z = p.Z;
+            if (t == null || !_collision.LineOfSight(p.X, p.Z, t.X, t.Z)) return false;
+            float dx = p.X - t.X, dz = p.Z - t.Z;
+            float d = Math.Max(0.001f, (float)Math.Sqrt(dx * dx + dz * dz));
+            double baseAngle = Math.Atan2(dx / d, dz / d);
+            foreach (double off in new[] { 0.0, 0.6, -0.6, 1.3, -1.3, Math.PI })
+            {
+                float lx = t.X + (float)Math.Sin(baseAngle + off) * 1.3f;
+                float lz = t.Z + (float)Math.Cos(baseAngle + off) * 1.3f;
+                if (_collision.IsSolid(lx, lz, 0.35f) || Math.Abs(lx) > CityLayout.MapHalf || Math.Abs(lz) > CityLayout.MapHalf) continue;
+                x = lx; z = lz;
+                return true;
+            }
+            return false;
+        }
+
+        private void CastPounce(PlayerEntity p, Entity t, float landX, float landZ)
+        {
+            StopFeeding(p, false);
+            TeleportPlayer(p, landX, landZ);
+            p.LastMoveTime = _now;
+            p.Rot = Heading(t.X - p.X, t.Z - p.Z);
+            var tm = t as Mortal;
+            var tp = t as PlayerEntity;
+            var th = t as Hunter;
+            if (tm != null)
+            {
+                if (tm.FedUponBy == 0) Charm(tm, p, 4);
+                Notice(p, NoticeLevel.Good, "You pin the " + tm.Name + " against the wall.");
+            }
+            else if (tp != null)
+            {
+                Stun(tp, 1f);
+                Damage(tp, 2f, p);
+                Notice(p, NoticeLevel.Good, "You pounce on " + tp.Name + "!");
+            }
+            else if (th != null)
+            {
+                th.StunnedUntil = _now + 1.5f;
+                Damage(th, 2f, p);
+                Notice(p, NoticeLevel.Good, "You bring the hunter down hard.");
+            }
+        }
+
+        private void CastPackHowl(PlayerEntity p, GiftDef gift)
+        {
+            int answered = 0;
+            foreach (PlayerEntity o in _players)
+            {
+                if (o.InTorpor || p.DistanceTo(o) > gift.Range) continue;
+                if (o == p || SameCircle(p, o) || IsDirectKin(p, o))
+                {
+                    o.EmboldenedUntil = _now + gift.Duration;
+                    if (o != p) Notice(o, NoticeLevel.Good, p.Name + "'s howl quickens your stride.");
+                    answered++;
+                }
+                else if (IsRivalInReach(p, o, 10f)) Slow(o, 4, p.Name + "'s howl");
+            }
+            int cowed = 0;
+            foreach (Hunter h in _hunters) if (p.DistanceTo(h) <= gift.Range) { h.StunnedUntil = _now + 4; cowed++; }
+            foreach (Mortal m in _mortals) if (m.Mode != MortalMode.Dead && m.FedUponBy == 0 && p.DistanceTo(m) <= gift.Range) Alarm(m, p.X, p.Z);
+            Notice(p, NoticeLevel.Good, "Every stray in the district answers your howl." + (cowed > 0 ? " The hunters cower." : ""));
         }
 
         private void Charm(Mortal m, PlayerEntity by, double seconds)
@@ -634,7 +823,8 @@ namespace Sanguine.Server
             }
         }
 
-        private void Damage(Entity target, float amount, PlayerEntity source)
+        /// <summary>Deals damage. Environmental harm (sun, starvation) does not break a Shroud or the Undercroft channel.</summary>
+        private void Damage(Entity target, float amount, PlayerEntity source, bool environmental = false)
         {
             if (target.IsDown) return;
             var tp = target as PlayerEntity;
@@ -646,6 +836,11 @@ namespace Sanguine.Server
             {
                 tp.LastCombat = _now;
                 if (tp.FeedTarget != 0) StopFeeding(tp, false);
+                if (!environmental)
+                {
+                    BreakShroud(tp);
+                    CancelUndercroft(tp, "you were struck");
+                }
                 if (source != null) Notice(tp, NoticeLevel.Warning, source.Name + " strikes you!");
             }
 

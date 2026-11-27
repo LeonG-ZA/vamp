@@ -58,6 +58,8 @@ namespace Sanguine
         Mist = 256,     // Crimson Mist: shown as swirling red mist
         IronSkin = 512,
         Majesty = 1024,
+        Shrouded = 2048,    // Shroud: only seen up close (or by circle, kin and Whispers)
+        Unchained = 4096,
     }
 
     [Flags]
@@ -84,6 +86,11 @@ namespace Sanguine
         Majesty = 1 << 17,
         Silenced = 1 << 18,
         Bonded = 1 << 19,      // sire or childe nearby: the blood bond
+        Shroud = 1 << 20,
+        Whispers = 1 << 21,
+        Undercroft = 1 << 22,  // slipping into the tunnels (Undercroft channel)
+        Emboldened = 1 << 23,  // Pack Howl speed
+        Unchained = 1 << 24,
     }
 
     public enum ThrallState : byte { Idle = 0, OnMission = 1, Recovering = 2 }

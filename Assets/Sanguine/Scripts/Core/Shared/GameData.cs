@@ -3,7 +3,7 @@
 // client and the standalone dedicated server.
 namespace Sanguine
 {
-    public enum Bloodline : byte { Vorlen = 0, Sylphine = 1, Ashborn = 2, Aurum = 3 }
+    public enum Bloodline : byte { Vorlen = 0, Sylphine = 1, Ashborn = 2, Aurum = 3, Umbren = 4, Varga = 5 }
 
     public enum EntityKind : byte { Player = 0, Mortal = 1, Hunter = 2 }
 
@@ -16,6 +16,8 @@ namespace Sanguine
         Allure = 3, Glamour = 4, Rapture = 5,
         BloodLash = 6, Siphon = 7, CrimsonMist = 8,
         Command = 9, Majesty = 10, Dominate = 11,
+        Shroud = 12, Whispers = 13, Undercroft = 14,
+        Pounce = 15, PackHowl = 16, Unchained = 17,
     }
 
     public sealed class GiftDef
@@ -87,7 +89,7 @@ namespace Sanguine
 
     public static class GameRules
     {
-        public const int ProtocolVersion = 5;
+        public const int ProtocolVersion = 6;
         public const int DefaultPort = 7777;
 
         // Movement
@@ -126,6 +128,15 @@ namespace Sanguine
         public const int GiftSlots = 3;
         /// <summary>Standing spent to learn the gift in each slot (slot 0 is innate).</summary>
         public static readonly int[] GiftStandingCost = { 0, 5, 12 };
+
+        // Bloodline gift tuning
+        /// <summary>A shrouded vampire is visible to rivals only this close.</summary>
+        public const float ShroudRevealRange = 6f;
+        /// <summary>Hunters lose a shrouded quarry that is farther away than this.</summary>
+        public const float ShroudHunterRange = 4f;
+        public const float EmboldenedSpeedMultiplier = 1.3f;
+        public const float UnchainedMeleeCooldown = 0.5f;
+        public const float UnchainedHealPerStrike = 1f;
 
         // Lineage: the Embrace, sires and childer
         /// <summary>Standing a childe in tutelage pays to learn a gift its sire knows (instead of GiftStandingCost).</summary>
@@ -186,6 +197,20 @@ namespace Sanguine
                 Description = "Old money and older blood. Their word is a chain upon lesser minds.",
                 MaxBlood = 10f, MaxHealth = 11f, MeleeDamage = 1f, FavoredDistrict = 3,
                 R = 0.9f, G = 0.75f, B = 0.3f
+            },
+            new BloodlineDef
+            {
+                Id = Bloodline.Umbren, Name = "Umbren", Epithet = "the Silent Watch",
+                Description = "Spies and information brokers of the tunnels under the city. Seldom seen, they always know.",
+                MaxBlood = 11f, MaxHealth = 10f, MeleeDamage = 1f, FavoredDistrict = 1,
+                R = 0.3f, G = 0.62f, B = 0.66f
+            },
+            new BloodlineDef
+            {
+                Id = Bloodline.Varga, Name = "Varga", Epithet = "the Hollow Pack",
+                Description = "Feral hunters of the waterfront and the rail yards who run with the city's strays.",
+                MaxBlood = 10f, MaxHealth = 12f, MeleeDamage = 2f, FavoredDistrict = 0,
+                R = 0.47f, G = 0.68f, B = 0.3f
             },
         };
 
@@ -266,6 +291,28 @@ namespace Sanguine
             new GiftDef { Id = GiftId.Dominate, Line = Bloodline.Aurum, Tier = 3, Name = "Dominate", Target = PowerTarget.Other,
                 Cost = 3f, Cooldown = 40f, Range = 9f, Duration = 6f, Subtle = true,
                 Description = "A hunter abandons the hunt; a rival is rooted 3s and silenced 6s; a mortal makes every witness within 10m forget (-30 exposure)." },
+
+            // Umbren, the Silent Watch
+            new GiftDef { Id = GiftId.Shroud, Line = Bloodline.Umbren, Tier = 1, Name = "Shroud", Target = PowerTarget.Self,
+                Cost = 2f, Cooldown = 20f, Duration = 10f, Subtle = true,
+                Description = "Fold the shadows around you for 10s: rivals farther than 6m cannot see or target you, and hunters lose you beyond 4m. Striking, feeding or another gift ends it." },
+            new GiftDef { Id = GiftId.Whispers, Line = Bloodline.Umbren, Tier = 2, Name = "Whispers", Target = PowerTarget.Self,
+                Cost = 2f, Cooldown = 30f, Duration = 20f, Range = 150f, Subtle = true,
+                Description = "The city's rats and gossips report: for 20s you sense every vampire within 150m, even shrouded ones, and learn where the nearest are." },
+            new GiftDef { Id = GiftId.Undercroft, Line = Bloodline.Umbren, Tier = 3, Name = "Undercroft", Target = PowerTarget.Self,
+                Cost = 3f, Cooldown = 60f, Duration = 2f,
+                Description = "Slip into the tunnels under the city: stand still for 2s (a blow breaks it) and you emerge in your haven, even by day." },
+
+            // Varga, the Hollow Pack
+            new GiftDef { Id = GiftId.Pounce, Line = Bloodline.Varga, Tier = 1, Name = "Pounce", Target = PowerTarget.Other,
+                Cost = 2f, Cooldown = 10f, Range = 12f,
+                Description = "Leap onto a target up to 12m away: rivals and hunters take 2 damage and are stunned 1s; a mortal is pinned, calm and ready to feed, for 4s." },
+            new GiftDef { Id = GiftId.PackHowl, Line = Bloodline.Varga, Tier = 2, Name = "Pack Howl", Target = PowerTarget.Self,
+                Cost = 2f, Cooldown = 35f, Range = 25f, Duration = 6f,
+                Description = "Every stray answers: hunters within 25m cower for 4s, mortals scatter, rivals within 10m are slowed; you, your circle and your kin run 30% faster for 6s." },
+            new GiftDef { Id = GiftId.Unchained, Line = Bloodline.Varga, Tier = 3, Name = "Unchained", Target = PowerTarget.Self,
+                Cost = 3f, Cooldown = 40f, Duration = 10f,
+                Description = "Let the beast out for 10s: strike twice as fast, every blow heals you 1, immune to roots, slows and stuns. You cannot feed, and mortals flee from you." },
         };
 
         static GameData()

@@ -40,6 +40,8 @@ cancelled *World of Darkness* MMO (see `RESEARCH.md`): a **politics-first sandbo
 | **Sylphine** | the Velvet Choir | 11 / 10 / 1 | Midtown |
 | **Ashborn** | the Grave Choir | 12 / 9 / 1 | Old Quarter |
 | **Aurum** | the Gilded Court | 10 / 11 / 1 | Financial Row |
+| **Umbren** | the Silent Watch | 11 / 10 / 1 | Midtown |
+| **Varga** | the Hollow Pack | 10 / 12 / 2 | Harbor |
 
 Each bloodline has **three gifts**, on keys 2, 3 and 4.
 - The first is innate.
@@ -61,9 +63,15 @@ Each bloodline has **three gifts**, on keys 2, 3 and 4.
 | **Command** (Aurum) | 1 | 2 / 12 s, 9 m, subtle | Mortal forgets (−15 exposure); rival rooted 2 s; hunter stunned 4 s |
 | **Majesty** (Aurum) | 2 | 2 / 30 s, subtle | 8 s: rivals cannot bring themselves to strike you; hunters keep 6 m away |
 | **Dominate** (Aurum) | 3 | 3 / 40 s, 9 m, subtle | Hunter abandons the hunt; rival rooted 3 s and **silenced** (no gifts) 6 s; mortal makes all witnesses within 10 m forget (−30 exposure) |
+| **Shroud** (Umbren) | 1 | 2 / 20 s, subtle | 10 s: rivals farther than 6 m can't see or target you (circle and kin still can); hunters lose you beyond 4 m and give up after 6 s. Striking, feeding, another gift or being struck ends it |
+| **Whispers** (Umbren) | 2 | 2 / 30 s, subtle | 20 s: you see every vampire within 150 m, shrouded ones included; a notice names the three nearest with distance, direction and whether they are Marked |
+| **Undercroft** (Umbren) | 3 | 3 / 60 s | Stand still for 2 s and you emerge in your haven, even by day. Moving or being struck breaks it (sunlight does not) |
+| **Pounce** (Varga) | 1 | 2 / 10 s, 12 m | Leap to the target's side (needs a clear line). Rival or hunter: 2 damage and a 1 s stun; mortal: pinned and calm for 4 s, so you can feed |
+| **Pack Howl** (Varga) | 2 | 2 / 35 s, 25 m | Hunters within 25 m cower 4 s, mortals scatter, rivals within 10 m are slowed 4 s; you, your circle and your kin within 25 m run 30% faster for 6 s |
+| **Unchained** (Varga) | 3 | 3 / 40 s | 10 s: melee cooldown halved, each strike heals 1, immune to roots, slows and stuns; you can't feed and mortals flee from you |
 
 Interactions:
-- Iron Skin blocks roots, slows and stuns, but not silence.
+- Iron Skin and Unchained block roots, slows and stuns, but not silence.
 - Crimson Mist can't be targeted.
 - Area gifts spare your circle, anyone in a haven or sanctum, and anyone in mist. They can't be used inside a sanctum.
 
@@ -86,7 +94,7 @@ Interactions:
 |---|---|
 | Starting to feed with witnesses within 15 m | +8 per witness (max 30) |
 | Feeding while watched | +5 per witness per second (max 25/s) |
-| Overt power use (all bloodlines except Aurum) | +8 per witness (max 25) |
+| Overt (non-subtle) gift use | +8 per witness (max 25) |
 | Public violence against a mortal or vampire | +3 per witness (max 15) |
 | A mortal killed | +20, plus 10 per witness |
 | A thrall caught | +10 |

@@ -103,6 +103,8 @@ namespace Sanguine
             AddZone(ZoneKind.Haven, "Aurum Haven: Gilt Vault", 6, 1, Bloodline.Aurum);
             AddZone(ZoneKind.Sanctum, "Sanctum: The Gilded Opera", 5, 4, Bloodline.Vorlen);
             AddZone(ZoneKind.Sanctum, "Sanctum: Chapel of Saint Veran", 2, 5, Bloodline.Vorlen);
+            AddZone(ZoneKind.Haven, "Umbren Haven: The Undercroft", 4, 6, Bloodline.Umbren);
+            AddZone(ZoneKind.Haven, "Varga Haven: The Rail Yard", 3, 2, Bloodline.Varga);
 
             Generate();
         }

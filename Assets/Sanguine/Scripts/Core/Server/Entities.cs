@@ -76,6 +76,9 @@ namespace Sanguine.Server
         public double AttackReadyAt;
         public readonly double[] GiftReadyAt = new double[GameRules.GiftSlots];
         public double IronSkinUntil, GlamourUntil, MistUntil, MajestyUntil, SilencedUntil;
+        public double ShroudUntil, WhispersUntil, EmboldenedUntil, UnchainedUntil;
+        public double UndercroftAt;            // when the Undercroft channel completes (0: not channelling)
+        public float UndercroftX, UndercroftZ;
         public double SurgeUntil, SlowUntil, RootUntil;
         public double TorporUntil = -1;
         public double OutlawUntil, BloodHuntUntil;

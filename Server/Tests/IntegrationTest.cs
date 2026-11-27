@@ -431,6 +431,72 @@ namespace Sanguine.Tests
                 Check(dorian.WaitFor(() => dorian.Lineage.Status == LineageStatus.Released && dorian.Lineage.CanSire, 3) &&
                       alaric.WaitFor(() => alaric.Self.Standing == releaseBefore + 3, 3), "Alaric releases Dorian (+3 standing); Dorian may now sire");
 
+                // --- New bloodlines ------------------------------------------------------
+                Console.WriteLine("[bloodlines]");
+                var esme = new Bot("Esme"); esme.Connect(port, "secret5", Bloodline.Umbren);
+                var fenn = new Bot("Fenn"); fenn.Connect(port, "secret6", Bloodline.Varga);
+                Check(esme.WaitFor(() => esme.Welcomed && esme.Self != null, 5) && server.City.HavenFor(Bloodline.Umbren).Contains(esme.X, esme.Z) &&
+                      fenn.WaitFor(() => fenn.Welcomed && fenn.Self != null, 5) && server.City.HavenFor(Bloodline.Varga).Contains(fenn.X, fenn.Z),
+                      "Umbren and Varga characters rise in their own havens");
+
+                // Umbren: Shroud, Whispers, Undercroft.
+                esme.Say("/tp -100 20");
+                esme.WaitFor(() => Math.Abs(esme.Z - 20f) < 0.1f, 2);
+                Check(corvin.WaitFor(() => corvin.Entities.Exists(e => e.Id == esme.Id), 3), "Corvin sees Esme 16m away");
+                esme.Conn.Send(SimpleMsg.Power(0, 0));
+                Check(esme.WaitFor(() => esme.Flag(SelfFlags.Shroud), 2) && corvin.WaitFor(() => !corvin.Entities.Exists(e => e.Id == esme.Id), 2),
+                      "Shroud hides Esme from a rival 16m away");
+                corvin.Conn.Send(SimpleMsg.Attack(esme.Id));
+                Check(corvin.WaitFor(() => corvin.HasNotice("cannot find them in the shadows"), 2), "a shrouded vampire cannot be targeted from afar");
+                Thread.Sleep(1100);
+                esme.Say("/tp -100 6");
+                Check(corvin.WaitFor(() => corvin.Entities.Exists(e => e.Id == esme.Id && (e.Flags & EntityFlags.Shrouded) != 0), 3),
+                      "up close, the shadows give her away");
+                esme.Conn.Send(SimpleMsg.Attack(corvin.Id));
+                Check(esme.WaitFor(() => !esme.Flag(SelfFlags.Shroud), 2), "striking breaks the Shroud");
+
+                esme.Say("/setstanding 20");
+                Thread.Sleep(1100);
+                esme.Say("/learn 2");
+                Thread.Sleep(1100);
+                esme.Say("/learn 3");
+                Check(esme.WaitFor(() => esme.Self.LearnedGifts == 7, 3), "Esme learns Whispers and Undercroft");
+                esme.Say("/setblood 11");
+                Thread.Sleep(1100);
+                esme.Conn.Send(SimpleMsg.Power(1, 0));
+                Check(esme.WaitFor(() => esme.Flag(SelfFlags.Whispers) && esme.Notices.Exists(n => n.StartsWith("Whispers:") && n.Contains("Corvin")), 2),
+                      "Whispers names the Kindred nearby");
+                esme.Conn.Send(SimpleMsg.Power(2, 0));
+                Check(esme.WaitFor(() => esme.Flag(SelfFlags.Undercroft), 2), "Esme slips toward the Undercroft");
+                Check(esme.WaitFor(() => server.City.HavenFor(Bloodline.Umbren).Contains(esme.X, esme.Z), 4), "two seconds later she climbs out in her haven");
+
+                // Varga: Pounce, Pack Howl, Unchained.
+                fenn.Say("/tp " + Fmt(corvin.X - 1f) + " " + Fmt(corvin.Z - 10f));
+                fenn.WaitFor(() => Math.Abs(fenn.Z - (corvin.Z - 10f)) < 0.1f, 2);
+                Thread.Sleep(300);
+                fenn.Conn.Send(SimpleMsg.Power(0, corvin.Id));
+                Check(fenn.WaitFor(() => Entity.Dist(fenn.X, fenn.Z, corvin.X, corvin.Z) < 2.5f && fenn.HasNotice("You pounce on Corvin"), 2) &&
+                      corvin.WaitFor(() => corvin.HasNotice("Fenn strikes you"), 2), "Pounce carries Fenn 10m onto Corvin");
+                Check(corvin.WaitFor(() => corvin.Flag(SelfFlags.Rooted), 1), "the pounce stuns Corvin");
+
+                fenn.Say("/setstanding 20");
+                Thread.Sleep(1100);
+                fenn.Say("/learn 2");
+                Thread.Sleep(1100);
+                fenn.Say("/learn 3");
+                Check(fenn.WaitFor(() => fenn.Self.LearnedGifts == 7, 3), "Fenn learns Pack Howl and Unchained");
+                fenn.Say("/setblood 10");
+                Thread.Sleep(1100);
+                fenn.Conn.Send(SimpleMsg.Power(1, 0));
+                Check(fenn.WaitFor(() => fenn.Flag(SelfFlags.Emboldened), 2) && corvin.WaitFor(() => corvin.Flag(SelfFlags.Slowed), 2),
+                      "Pack Howl quickens Fenn and slows Corvin");
+                fenn.Conn.Send(SimpleMsg.Power(2, 0));
+                Check(fenn.WaitFor(() => fenn.Flag(SelfFlags.Unchained), 2), "Fenn lets the beast off its chain");
+                beatrix.Say("/setblood 10");
+                Thread.Sleep(400);
+                beatrix.Conn.Send(SimpleMsg.Power(0, fenn.Id)); // Command roots a rival
+                Check(fenn.WaitFor(() => fenn.HasNotice("will not kneel"), 2) && !fenn.Flag(SelfFlags.Rooted), "Unchained shrugs off Beatrix's Command");
+
                 // --- Persistence -----------------------------------------------------
                 Console.WriteLine("[persistence]");
                 int standing = alaric.Self.Standing;

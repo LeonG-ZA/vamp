@@ -98,6 +98,7 @@ namespace Sanguine.Client
             if ((f & SelfFlags.Surge) != 0) speed *= GameRules.SurgeSpeedMultiplier;
             if ((f & SelfFlags.Slowed) != 0) speed *= GameRules.SlowSpeedMultiplier;
             if ((f & SelfFlags.Mist) != 0) speed *= 1.3f;
+            if ((f & SelfFlags.Emboldened) != 0) speed *= GameRules.EmboldenedSpeedMultiplier;
             if ((f & SelfFlags.Feeding) != 0) speed = 0f; // moving would break the embrace; press F to release first
             if (frozen) speed = 0f;
 
@@ -117,7 +118,8 @@ namespace Sanguine.Client
             Vector3 v = _cc.velocity;
             v.y = 0f;
             _visual.SetMotion(v.magnitude, (f & SelfFlags.Feeding) != 0, (f & SelfFlags.Torpor) != 0);
-            _aura.Show((f & SelfFlags.Mist) != 0, (f & SelfFlags.Majesty) != 0, (f & SelfFlags.IronSkin) != 0);
+            _aura.Show((f & SelfFlags.Mist) != 0, (f & SelfFlags.Majesty) != 0, (f & SelfFlags.IronSkin) != 0,
+                       (f & (SelfFlags.Shroud | SelfFlags.Undercroft)) != 0, (f & SelfFlags.Unchained) != 0);
 
             // --- Network ------------------------------------------------------
             if (Time.time >= _nextSend)
