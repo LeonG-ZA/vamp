@@ -32,6 +32,12 @@ mechanic, feeding on humans and ghoul-style minion missions. The setting and rul
   - deferred HDR camera with about 390 real lights; the nearest lamps cast shadows;
   - wet streets with realtime reflections;
   - bloom, ambient occlusion, screen-space reflections and ACES grading.
+- **Soundscape:**
+  - night-city and daytime ambience, rain on the wet streets and a dark ambient score;
+  - fire barrels crackle and neon buzzes where they stand;
+  - footsteps change between wet asphalt, pavement and cobbles;
+  - feeding has a bite and a quickening heartbeat, and strikes, each bloodline's gift, torpor, sunlight, danger and the dawn bell all have cues;
+  - havens and sanctums muffle the street noise.
 - **Still runs without any art:** if the art or packages are missing, the game falls back to flat colours and simple shapes. Open the project and press Play.
 
 ## Quick start (Unity)
@@ -64,6 +70,16 @@ The script:
 - generates `PropCatalog.g.cs` and `CREDITS.md`.
 
 `CityDressing` (shared, engine-free code) decides every building's facade and where each lamp, car, door, fire escape and light goes. The Unity client and the preview tool therefore build the same city.
+
+## Audio
+
+All sounds are original and synthesised by `Tools/audio/synth_audio.py` (numpy + ffmpeg/libvorbis), so they carry no third-party license:
+
+```bash
+python3 Tools/audio/synth_audio.py      # writes 32 Ogg Vorbis files (~2 MB) to Assets/Sanguine/Resources/Audio
+```
+
+Loops are built with circular processing, so they repeat without clicks. `AudioDirector` drives everything from the state the client already receives, so no gameplay code calls into audio. Master and music volume are set in the main menu.
 
 ## Characters
 

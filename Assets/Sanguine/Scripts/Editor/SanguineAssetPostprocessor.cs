@@ -11,6 +11,7 @@ namespace Sanguine.EditorTools
     ///  - Resources/Sky: HDR equirectangular skies without mipmaps (no seam at the wrap).
     ///  - Resources/Characters: rigged models imported as Humanoid avatars.
     ///  - Resources/Animations: Humanoid clips; idle/walk/run style clips loop, in place.
+    ///  - Resources/Audio: ambience/music stream, effects decompress on load (Vorbis).
     /// </summary>
     public sealed class SanguineAssetPostprocessor : AssetPostprocessor
     {
@@ -56,6 +57,21 @@ namespace Sanguine.EditorTools
                     ti.sRGBTexture = true;
                 }
             }
+        }
+
+        private void OnPreprocessAudio()
+        {
+            if (!assetPath.StartsWith(Root + "Audio/")) return;
+            var ai = (AudioImporter)assetImporter;
+            string file = Path.GetFileNameWithoutExtension(assetPath).ToLowerInvariant();
+            AudioImporterSampleSettings st = ai.defaultSampleSettings;
+            st.compressionFormat = AudioCompressionFormat.Vorbis;
+            bool longLoop = file.StartsWith("amb_") || file.StartsWith("music_");
+            // Long beds stream from disk; short loops and effects are decoded once for instant playback.
+            st.loadType = longLoop ? AudioClipLoadType.Streaming : AudioClipLoadType.DecompressOnLoad;
+            st.quality = longLoop ? 0.6f : 0.8f;
+            ai.defaultSampleSettings = st;
+            ai.loadInBackground = longLoop;
         }
 
         private void OnPreprocessModel()

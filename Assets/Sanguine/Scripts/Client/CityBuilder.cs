@@ -123,6 +123,7 @@ namespace Sanguine.Client
             // Lights.
             var director = root.AddComponent<CityLights>();
             foreach (LightPlacement l in dressing.Lights) director.Add(CreateLight(l, lightsRoot), l.Kind);
+            if (AudioDirector.Instance != null) AudioDirector.Instance.SetEmitters(dressing.Lights);
 
             // Static geometry batching (procedural meshes only; imported props stay instanced).
             StaticBatchingUtility.Combine(chunksRoot.gameObject);

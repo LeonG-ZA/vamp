@@ -149,10 +149,19 @@ namespace Sanguine.Client
                             "\nBlood " + sel.MaxBlood + "  Health " + sel.MaxHealth + "  Melee " + sel.MeleeDamage +
                             "  Favoured district: " + GameData.Districts[sel.FavoredDistrict].Name, _small);
 
+            GUILayout.Space(6);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Volume", _label, GUILayout.Width(80));
+            AudioDirector.MasterVolume = GUILayout.HorizontalSlider(AudioDirector.MasterVolume, 0f, 1f, GUILayout.Width(200));
+            GUILayout.Space(20);
+            GUILayout.Label("Music", _label, GUILayout.Width(50));
+            AudioDirector.MusicVolume = GUILayout.HorizontalSlider(AudioDirector.MusicVolume, 0f, 1f, GUILayout.Width(200));
+            GUILayout.EndHorizontal();
+
             GUILayout.FlexibleSpace();
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Join Server", GUILayout.Height(40))) { SavePrefs(); Client.Connect(false); }
-            if (GUILayout.Button("Host & Play", GUILayout.Height(40))) { SavePrefs(); Client.Connect(true); }
+            if (GUILayout.Button("Join Server", GUILayout.Height(40))) { SavePrefs(); UiClick(); Client.Connect(false); }
+            if (GUILayout.Button("Host & Play", GUILayout.Height(40))) { SavePrefs(); UiClick(); Client.Connect(true); }
             if (GUILayout.Button("Quit", GUILayout.Height(40), GUILayout.Width(90))) Application.Quit();
             GUILayout.EndHorizontal();
             GUI.enabled = true;
@@ -375,10 +384,16 @@ namespace Sanguine.Client
             if (ActionButton(new Rect(x, y, bw, bh), "[H] Help", 0)) Client.HelpOpen = !Client.HelpOpen;
         }
 
+        private static void UiClick()
+        {
+            if (AudioDirector.Instance != null) AudioDirector.Instance.Click();
+        }
+
         private bool ActionButton(Rect r, string text, float cooldown)
         {
             var style = new GUIStyle(GUI.skin.button) { richText = true, fontSize = 13 };
             bool pressed = GUI.Button(r, text, style);
+            if (pressed) UiClick();
             if (cooldown > 0.05f)
             {
                 Fill(r, new Color(0, 0, 0, 0.55f));

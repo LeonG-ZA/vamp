@@ -64,6 +64,7 @@ namespace Sanguine.Client
             Application.runInBackground = true;
             gameObject.AddComponent<ClientUI>().Client = this;
             gameObject.AddComponent<Atmosphere>().Client = this;
+            gameObject.AddComponent<AudioDirector>().Client = this;
             if (Camera.main == null)
             {
                 var camGo = new GameObject("Main Camera");
@@ -218,6 +219,7 @@ namespace Sanguine.Client
                 {
                     var n = new NoticeLine { Level = (NoticeLevel)r.Byte(), Text = r.Str(), Time = Time.time };
                     Notices.Add(n);
+                    if (AudioDirector.Instance != null) AudioDirector.Instance.OnNotice(n.Level);
                     if (Notices.Count > 5) Notices.RemoveAt(0);
                     break;
                 }
