@@ -41,7 +41,9 @@ namespace Sanguine.Client
         private SelfFlags _prevFlags;
         private float _prevAttackCd;
         private readonly float[] _prevGiftCd = new float[GameRules.GiftSlots];
-        private bool _prevIsDay, _haveWorld, _haveSelf;
+        private bool _prevIsDay, _haveWorld, _haveSelf, _haveLineage;
+        private string _prevSire = "";
+        private int _prevChilder;
         private float _lastSting;
 
         private Vector3 _lastLocalPos;
@@ -195,6 +197,18 @@ namespace Sanguine.Client
             _rain.volume = 0.5f * (1f - _day) * outside;
             _music.volume = MusicVolume * (inGame ? 0.55f : 0.8f) * (1f - _day * 0.7f);
             if (!_music.isPlaying && _music.clip != null) _music.Play();
+
+            // The Embrace: becoming a childe, or gaining one.
+            LineageMsg lin = inGame ? Client.Lineage : null;
+            if (lin != null)
+            {
+                string sire = lin.Sire.Name ?? "";
+                if (_haveLineage && ((sire.Length > 0 && sire != _prevSire) || lin.Childer.Length > _prevChilder)) Play("sfx_embrace", 0.9f);
+                _prevSire = sire;
+                _prevChilder = lin.Childer.Length;
+                _haveLineage = true;
+            }
+            else _haveLineage = false;
 
             if (self != null) UpdateSelf(self, dt);
             else

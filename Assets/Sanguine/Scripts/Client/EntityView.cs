@@ -93,7 +93,21 @@ namespace Sanguine.Client
 
         public void ApplyInfo(EntityInfoMsg info)
         {
+            // A vampire Embraced into another bloodline (or info that arrived after the body was built) needs a new body.
+            bool rebuild = Kind == EntityKind.Player && _visual != null && info.Bloodline != Info.Bloodline;
             Info = info;
+            if (rebuild) RebuildVisual();
+        }
+
+        private void RebuildVisual()
+        {
+            foreach (Transform child in transform) Destroy(child.gameObject);
+            if (_aura != null) Destroy(_aura);
+            CapsuleCollider cap = GetComponent<CapsuleCollider>();
+            if (cap != null) DestroyImmediate(cap);
+            _aura = null;
+            _crown = _markLight = _bloodPool = null;
+            BuildVisual();
         }
 
         public void ApplyState(EntityState s, float now)

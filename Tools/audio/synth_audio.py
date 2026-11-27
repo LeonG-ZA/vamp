@@ -581,6 +581,43 @@ def torpor():
     return fade(normalize(reverb(x, 3.0, 0.45), -2.0))
 
 
+def embrace():
+    """The Embrace: the fledgling's racing heartbeat slows until it beats as one with the sire's,
+    over a slowly swelling D-minor chord and a rush of blood."""
+    r = rng(340)
+    dur = 6.5
+    tt = t_axis(dur)
+    x = np.zeros(len(tt))
+    hz = lambda m: 440.0 * 2 ** ((m - 69) / 12)
+
+    def beat(f, amp):
+        bt = t_axis(0.32)
+        one = np.zeros(int(0.62 * SR))
+        for start, ff, a, dec in [(0.0, f, 1.0, 0.09), (0.27, f * 1.27, 0.7, 0.07)]:
+            add_at(one, np.sin(TAU * ff * bt * (1 - 0.3 * bt)) * np.exp(-bt / dec) * np.minimum(1, bt / 0.008) * a, int(start * SR))
+        return one * amp
+
+    meet = 3.15
+    for t0 in (0.3, 1.25, 2.2):                       # the sire: slow and steady
+        add_at(x, beat(48, 0.8), int(t0 * SR))
+    for t0 in (0.15, 0.75, 1.45, 2.25):               # the fledgling: racing, slowing to match
+        add_at(x, beat(66, 0.5), int(t0 * SR))
+    for i, t0 in enumerate((meet, meet + 0.95, meet + 1.9)):   # one heart
+        add_at(x, beat(52, 1.15 - 0.3 * i) + beat(66, 0.35 - 0.1 * i)[:int(0.62 * SR)], int(t0 * SR))
+
+    env = np.clip((tt - 0.4) / 2.8, 0, 1) ** 2 * np.exp(-np.maximum(tt - meet, 0) / 1.6)
+    chord = np.zeros(len(tt))
+    for m, a in [(38, 1.0), (45, 0.7), (50, 0.6), (53, 0.5), (57, 0.4), (64, 0.25)]:
+        vib = 1 + 0.004 * np.sin(TAU * r.uniform(4.6, 5.6) * tt + r.uniform(0, TAU))
+        ph = np.cumsum(TAU * hz(m) * vib / SR)
+        chord += sum(np.sin(k * ph) / k ** 1.4 for k in range(1, 6)) * a
+    x += band(chord, 50, 3000) * env * 0.09
+
+    rush = np.sin(np.pi * np.clip((tt - 1.0) / 2.2, 0, 1)) ** 2
+    x += band(r.standard_normal(len(tt)), 250, 2200) * rush * 0.12
+    return fade(normalize(reverb(x, 3.0, 0.4), -2.0), 0.002, 0.6)
+
+
 def sting_danger():
     r = rng(330)
     dur = 2.2
@@ -653,6 +690,7 @@ def main():
     save('power_majesty', power_majesty())
     save('power_dominate', power_dominate())
     save('sfx_torpor', torpor())
+    save('sfx_embrace', embrace())
     save('sting_danger', sting_danger())
     save('sting_good', chime())
     save('sfx_dawn_bell', dawn_bell())

@@ -19,6 +19,10 @@ mechanic, feeding on humans and ghoul-style minion missions. The setting and rul
   - **Ashborn:** Blood Lash, Siphon, Crimson Mist.
   - **Aurum:** Command, Majesty, Dominate.
   The full table is in [DESIGN.md](Docs/DESIGN.md#4-bloodlines-and-gifts).
+- **Sires and childer.** A fledgling can accept the Embrace from an elder and is remade in the sire's bloodline.
+  - The sire teaches gifts for less standing and answers for the childe's crimes until releasing them.
+  - Sire and childe can't harm each other, are stronger side by side and feel each other fall.
+  - The whole family shares a chat channel. See [DESIGN.md](Docs/DESIGN.md#64-lineage-sires-and-childer).
 - **Feeding** on a living crowd of mortals in four districts, and the choice to release them in time or let them die.
 - **The Hush:** witnesses raise your Exposure. Hunters come at 50%, and at 80% any vampire may kill you.
 - **Conscience:** killing mortals lets the Beast take over.
@@ -42,6 +46,7 @@ mechanic, feeding on humans and ghoul-style minion missions. The setting and rul
   - fire barrels crackle and neon buzzes where they stand;
   - footsteps change between wet asphalt, pavement and cobbles;
   - feeding has a bite and a quickening heartbeat, and strikes, each bloodline's gift, torpor, sunlight, danger and the dawn bell all have cues;
+  - in the Embrace, the fledgling's racing heart slows until it beats as one with the sire's;
   - havens and sanctums muffle the street noise.
 - **Still runs without any art:** if the art or packages are missing, the game falls back to flat colours and simple shapes. Open the project and press Play.
 
@@ -81,7 +86,7 @@ The script:
 All sounds are original and synthesised by `Tools/audio/synth_audio.py` (numpy + ffmpeg/libvorbis), so they carry no third-party license:
 
 ```bash
-python3 Tools/audio/synth_audio.py      # writes 32 Ogg Vorbis files (~2 MB) to Assets/Sanguine/Resources/Audio
+python3 Tools/audio/synth_audio.py      # writes 41 Ogg Vorbis files (~2.3 MB) to Assets/Sanguine/Resources/Audio
 ```
 
 Loops are built with circular processing, so they repeat without clicks. `AudioDirector` drives everything from the state the client already receives, so no gameplay code calls into audio. Master and music volume are set in the main menu.
@@ -115,11 +120,12 @@ The repository doesn't ship realistic human models yet. None of the CC0 sources 
 | 2 / 3 / 4 | Use your bloodline's three gifts |
 | G | Gifts panel (learn new gifts with standing) |
 | T | Thrall panel |
+| L | Lineage panel (Embrace, release, disown) |
 | Enter | Chat (`/help` for commands) |
 | H / F1 | Help |
 | Esc | Clear target, close panels |
 
-Chat commands: `/help /who /stats /districts /gifts /learn /say /c /city /circle … /vote /thrall /hunt /edict`.
+Chat commands: `/help /who /stats /districts /gifts /learn /say /c /lin /city /circle … /vote /thrall /hunt /edict /embrace /accept /refuse /lineage …`.
 
 ## Dedicated server without Unity
 
@@ -148,10 +154,11 @@ Server options: `--port --seed --save --night --day --mortals --max-players --de
 - PvP rules (circle immunity, Outlaw, torpor and respawn) and sanctums;
 - collision with buildings and hunters routing around them along the streets;
 - learning gifts with standing and the main gift effects (Siphon, Iron Skin, Dominate, Majesty, Crimson Mist);
+- the Embrace and lineage: offers, the bloodline change, the blood bond, lineage chat, kin protection, taught gifts, a sire's shame, release and renouncing;
 - persistence across a server restart.
 
 ```bash
-Server/build.sh && mono Server/bin/SanguineTests.exe     # 61 passed, 0 failed
+Server/build.sh && mono Server/bin/SanguineTests.exe     # 83 passed, 0 failed
 ```
 
 ## Project layout
@@ -159,7 +166,7 @@ Server/build.sh && mono Server/bin/SanguineTests.exe     # 61 passed, 0 failed
 ```
 Assets/Sanguine/Scripts/Core/      Sanguine.Core asmdef (no UnityEngine): shared + server
   Shared/  GameData (rules, bloodlines, districts), CityLayout (deterministic city), Protocol, Connection (TCP framing)
-  Server/  GameServer (+ .Rules / .Ai / .Politics), Entities, Persistence, ServerConfig
+  Server/  GameServer (+ .Rules / .Ai / .Politics / .Lineage), Entities, Persistence, ServerConfig
 Assets/Sanguine/Scripts/Client/    Sanguine.Client asmdef: Bootstrap, GameClient, LocalPlayer, EntityView,
                                    CityBuilder, Atmosphere, ClientUI (IMGUI), Mats
 Assets/Sanguine/Scripts/Editor/    Menu items: create scene, build clients / dedicated server

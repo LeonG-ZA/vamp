@@ -48,6 +48,15 @@ namespace Sanguine.Client
             return lp;
         }
 
+        /// <summary>Rebuilds the body after the Embrace remade us in another bloodline.</summary>
+        public void SetBloodline(Bloodline bloodline)
+        {
+            if (_aura != null) Destroy(_aura);
+            foreach (Transform child in transform) Destroy(child.gameObject);
+            _visual = CharacterVisual.Create(transform, CharacterRole.Vampire, Client.MyId, bloodline);
+            _aura = GiftAura.Attach(gameObject, _visual.gameObject);
+        }
+
         public void Teleport(Vector3 pos)
         {
             _cc.enabled = false;

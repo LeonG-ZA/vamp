@@ -131,6 +131,25 @@ Circle chat is `/c`. A circle dissolves when its last member leaves.
 - At dawn the top candidate becomes **Regent**. Ties go to higher standing, then to name order.
 - The Regent's powers: `/edict <text>` (broadcast, persistent) and **one `/hunt <name>` per night**. The target is Marked for 10 minutes and the whole city is told.
 
+### 6.4 Lineage: sires and childer
+Every new character is a **fledgling**: no sire, and only their innate gift.
+
+- **The Embrace.** A vampire who knows their second gift and is free of tutelage may `/embrace <name>` a fledgling standing within 3 m.
+  - The fledgling has 60 s to `/accept` or `/refuse` (the client shows a prompt).
+  - On acceptance the sire gives 3 blood. The fledgling is remade in the sire's bloodline: new innate gift, health and haven, fully healed and +3 blood.
+  - A fledgling who learns their second gift without a sire becomes **Unclaimed** and can no longer be Embraced. Waiting for a sire is a real choice.
+- **Tutelage.** A sire may have up to 3 childer in tutelage at once. A childe in tutelage:
+  - learns gifts the sire knows for **3 and 7 standing** instead of 5 and 12, and the sire gains +1 standing for each gift taught;
+  - cannot sire;
+  - shames the sire, who pays standing for the childe's crimes: killing a mortal −1, breaking the Hush (becoming Marked) −1, murder (Outlaw) −2.
+- **Release.** Once the childe knows all three gifts, the sire may `/lineage release <childe>` them for **+3 standing**. The childe may then sire, and the sire no longer answers for them.
+- **Ties** between sire and childe, during and after tutelage:
+  - they cannot harm each other, and area gifts spare them;
+  - **blood bond:** within 20 m, both mend every 1 s instead of 2 s and take 20% less damage;
+  - each feels the other fall into torpor, and is told the district and the attacker.
+- **The family** is the whole tree under its eldest ancestor. It shares the **lineage chat** (`/lin`), and nameplates show *your sire*, *your childe*, *sibling* or *kin*.
+- **Breaking the line.** A sire may `/lineage disown <childe>`, and a childe may `/lineage renounce` their sire. The childe (with their own childer) leaves the family but keeps their bloodline.
+
 ## 7. Technical design
 
 - **Authoritative server** in plain C# (`Assets/Sanguine/Scripts/Core`, `noEngineReferences`). It runs:
@@ -140,13 +159,14 @@ Circle chat is `/c`. A circle dissolves when its last member leaves.
 - **Transport:** TCP with length-prefixed binary frames (`Protocol.cs`, `Connection.cs`).
   - The server ticks at 20 Hz and sends snapshots at 10 Hz, limited to a 90 m interest radius.
   - Self-state goes out at 5 Hz and world-state every 2 s.
-  - Entity names and circles go in an `EntityInfo` message the first time an entity is seen, and again when they change.
+  - Entity names, circles and sires go in an `EntityInfo` message the first time an entity is seen, and again when they change.
+  - Each player's place in the family tree goes in a `Lineage` message when it changes and every 2 s.
 - **Movement:** the client moves locally and sends its position at 15 Hz.
   - The server checks each move against the speed limit and the root/torpor/feeding states. A failed move gets a `Teleport` correction.
   - The server knows the same solid geometry as the client (`CityCollision`, built from `CityDressing`) and rejects moves into buildings.
 - **NPC navigation:** hunters and charmed mortals chase directly while the target is in line of sight; otherwise they follow an A* route over the street grid, aiming for the farthest route node they can see.
 - **City:** a deterministic layout from a shared seed (`CityLayout.cs`, xorshift RNG), so server AI and client visuals agree.
-- **Persistence:** plain-text files (profiles, plus world state: circles, influence, regent, edict).
+- **Persistence:** plain-text files (profiles, including each character's sire, plus world state: circles, influence, regent, edict). The childer index is rebuilt from the profiles at startup.
   - Passwords are stored as salted SHA-256.
   - Saves are atomic, happen every 60 s, and also run on logout and shutdown.
 - **Client:** creates everything at runtime (`Bootstrap` uses `RuntimeInitializeOnLoadMethod`): the procedural city, primitive avatars and an IMGUI HUD. No art assets or prefabs are needed.
@@ -154,7 +174,6 @@ Circle chat is `/c`. A circle dissolves when its last member leaves.
 ## 8. Roadmap (beyond the prototype)
 
 - Lag compensation; move to UDP (e.g. Unity Transport) for scale.
-- Sire/childe lineage (the Embrace as a player action), with brood-style ties.
 - Animated character models.
 - Hunting-ground ownership inside districts; NPC informants; police and media reacting to exposure.
 - Database persistence (PostgreSQL), account service, server sharding by city.

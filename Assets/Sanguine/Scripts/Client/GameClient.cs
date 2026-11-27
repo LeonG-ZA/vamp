@@ -34,6 +34,8 @@ namespace Sanguine.Client
         public Bloodline MyBloodline;
         public SelfStateMsg Self;
         public WorldStateMsg World;
+        public LineageMsg Lineage;
+        public float LineageReceivedAt;
         public CityLayout City;
         public LocalPlayer Local;
         public readonly Dictionary<int, EntityView> Views = new Dictionary<int, EntityView>();
@@ -48,6 +50,7 @@ namespace Sanguine.Client
         public bool ThrallPanelOpen;
         public bool HelpOpen;
         public bool GiftsPanelOpen;
+        public bool LineagePanelOpen;
 
         public GameServer HostedServer { get; private set; }
 
@@ -198,7 +201,16 @@ namespace Sanguine.Client
             {
                 case Msg.Welcome: OnWelcome(WelcomeMsg.Read(r)); break;
                 case Msg.LoginFailed: Disconnect("Login failed: " + r.Str()); break;
-                case Msg.SelfState: Self = SelfStateMsg.Read(r); break;
+                case Msg.SelfState:
+                    Self = SelfStateMsg.Read(r);
+                    if (Self.Bloodline != MyBloodline)
+                    {
+                        // Embraced into another bloodline: new body, new gifts.
+                        MyBloodline = Self.Bloodline;
+                        if (Local != null) Local.SetBloodline(MyBloodline);
+                    }
+                    break;
+                case Msg.Lineage: Lineage = LineageMsg.Read(r); LineageReceivedAt = Time.time; break;
                 case Msg.WorldState: World = WorldStateMsg.Read(r); break;
                 case Msg.Snapshot: OnSnapshot(r); break;
                 case Msg.EntityInfo:
@@ -238,6 +250,7 @@ namespace Sanguine.Client
             MyId = w.EntityId;
             MyName = w.Name;
             MyBloodline = w.Bloodline;
+            Lineage = null;
             BuildCity(w.CitySeed);
             if (_entityRoot == null) _entityRoot = new GameObject("Entities");
             Local = LocalPlayer.Create(this, w.Bloodline, new Vector3(w.X, CityDressing.GroundHeight(w.X, w.Z) + 0.05f, w.Z));
@@ -305,13 +318,14 @@ namespace Sanguine.Client
 
             if (Input.GetMouseButtonDown(0) && !UiCapturesMouse) PickTarget();
             if (Input.GetKeyDown(KeyCode.Tab)) CycleTarget();
-            if (Input.GetKeyDown(KeyCode.Escape)) { TargetId = 0; ThrallPanelOpen = false; HelpOpen = false; GiftsPanelOpen = false; }
+            if (Input.GetKeyDown(KeyCode.Escape)) { TargetId = 0; ThrallPanelOpen = false; HelpOpen = false; GiftsPanelOpen = false; LineagePanelOpen = false; }
             if (Input.GetKeyDown(KeyCode.F)) ToggleFeed();
             if (Input.GetKeyDown(KeyCode.Alpha1)) DoAttack();
             if (Input.GetKeyDown(KeyCode.Alpha2)) UseGift(0);
             if (Input.GetKeyDown(KeyCode.Alpha3)) UseGift(1);
             if (Input.GetKeyDown(KeyCode.Alpha4)) UseGift(2);
             if (Input.GetKeyDown(KeyCode.G)) GiftsPanelOpen = !GiftsPanelOpen;
+            if (Input.GetKeyDown(KeyCode.L)) LineagePanelOpen = !LineagePanelOpen;
             if (Input.GetKeyDown(KeyCode.T)) ThrallPanelOpen = !ThrallPanelOpen;
             if (Input.GetKeyDown(KeyCode.H) || Input.GetKeyDown(KeyCode.F1)) HelpOpen = !HelpOpen;
         }
@@ -349,7 +363,7 @@ namespace Sanguine.Client
             GiftDef gift = MyDef.Gifts[slot];
             if (!KnowsGift(slot))
             {
-                LocalNotice(gift.Name + " is not learned yet (" + gift.StandingCost + " standing). Press G.");
+                LocalNotice(gift.Name + " is not learned yet (" + GiftCost(slot) + " standing). Press G.");
                 GiftsPanelOpen = true;
                 return;
             }
@@ -357,6 +371,42 @@ namespace Sanguine.Client
             EntityView t = Target;
             if (t == null) { LocalNotice(gift.Name + " needs a target."); return; }
             Send(SimpleMsg.Power(slot, t.Id));
+        }
+
+        // ------------------------------------------------------------------
+        // Lineage
+        // ------------------------------------------------------------------
+
+        /// <summary>True when the sire is teaching this gift (a childe in tutelage whose sire knows it).</summary>
+        public bool TaughtBySire(int slot)
+        {
+            return Lineage != null && Lineage.Status == LineageStatus.Tutelage && Lineage.Sire.GiftsKnown > slot;
+        }
+
+        /// <summary>Standing needed to learn the gift in a slot, with the sire's discount if they teach it.</summary>
+        public int GiftCost(int slot)
+        {
+            return TaughtBySire(slot) ? GameRules.TaughtGiftStandingCost[slot] : MyDef.Gifts[slot].StandingCost;
+        }
+
+        /// <summary>How another vampire is related to us: "your sire", "your childe", "sibling", "kin" or "".</summary>
+        public string KinOf(EntityView v)
+        {
+            if (v == null || v.Kind != EntityKind.Player || Lineage == null || string.IsNullOrEmpty(v.Info.Name)) return "";
+            string n = v.Info.Name;
+            string mySire = Lineage.Sire.Name ?? "";
+            if (mySire.Length > 0 && mySire == n) return "your sire";
+            if (v.Info.Sire == MyName) return "your childe";
+            if (mySire.Length > 0 && v.Info.Sire == mySire) return "sibling";
+            foreach (string a in Lineage.Ancestors) if (a == n) return "elder of your line";
+            foreach (string f in Lineage.Family) if (f == n) return "kin";
+            return "";
+        }
+
+        public void OfferEmbrace(EntityView t)
+        {
+            if (t == null || t.Kind != EntityKind.Player || string.IsNullOrEmpty(t.Info.Name)) { LocalNotice("Target the fledgling you wish to Embrace."); return; }
+            SendChat(ChatChannel.Local, "/embrace " + t.Info.Name);
         }
 
         public void SendChat(ChatChannel ch, string text)

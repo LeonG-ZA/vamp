@@ -61,6 +61,7 @@ namespace Sanguine.Server
             _store = new Store(cfg.SaveDirectory, cfg.Log);
             _profiles = _store.LoadAllProfiles();
             _world = _store.LoadWorld();
+            BuildLineageIndex();
             Log("Loaded " + _profiles.Count + " profiles, " + _world.Circles.Count + " circles, night " + _world.Night + ".");
         }
 
@@ -153,7 +154,12 @@ namespace Sanguine.Server
 
             if (now >= _nextSnapshot) { _nextSnapshot = now + 1.0 / _cfg.SnapshotRate; SendSnapshots(); }
             if (now >= _nextSelfState) { _nextSelfState = now + 0.2; foreach (var p in _players) SendSelfState(p); }
-            if (now >= _nextWorldState) { _nextWorldState = now + 2.0; foreach (var p in _players) SendWorldState(p); }
+            if (now >= _nextWorldState)
+            {
+                _nextWorldState = now + 2.0;
+                foreach (var p in _players) { SendWorldState(p); SendLineage(p); }
+            }
+            foreach (var p in _players) if (p.LineageDirty) SendLineage(p);
             if (now >= _nextAutosave)
             {
                 _nextAutosave = now + _cfg.AutosaveSeconds;
@@ -284,6 +290,7 @@ namespace Sanguine.Server
             s.Player = p;
             _entities[p.Id] = p;
             lock (_players) _players.Add(p);
+            MarkLineageDirty();
 
             s.Send(new WelcomeMsg { EntityId = p.Id, Name = prof.Name, Bloodline = prof.Bloodline, CitySeed = _cfg.CitySeed, X = p.X, Z = p.Z, NewCharacter = isNew }.Write());
             SendSelfState(p);
@@ -296,6 +303,7 @@ namespace Sanguine.Server
                 SystemMsg(p, "You are of the " + def.Name + ", " + def.Epithet + ". Your gift: " + def.Gifts[0].Name + " - " + def.Gifts[0].Description);
                 SystemMsg(p, "Two more gifts can be learned with standing: " + def.Gifts[1].Name + " (" + def.Gifts[1].StandingCost + ") and " +
                              def.Gifts[2].Name + " (" + def.Gifts[2].StandingCost + "). See /gifts.");
+                SystemMsg(p, "You are a fledgling. Until you learn your second gift, an elder may offer you the Embrace and become your sire (/lineage).");
                 SystemMsg(p, "Type /help for commands. Feed (F) on mortals away from witnesses. Return to your haven before dawn.");
             }
             else Notice(p, NoticeLevel.Info, "You rise again, " + prof.Name + ".");
@@ -316,6 +324,7 @@ namespace Sanguine.Server
             SavePlayer(p);
             _entities.Remove(p.Id);
             lock (_players) _players.Remove(p);
+            MarkLineageDirty();
             foreach (var h in _hunters) if (h.TargetPlayer == p.Id) h.TargetPlayer = 0;
             foreach (var o in _players) o.Known.Remove(p.Id);
             Log(p.Name + " left (" + reason + ").");
@@ -401,9 +410,9 @@ namespace Sanguine.Server
 
         private EntityInfoMsg InfoFor(Entity e)
         {
-            var info = new EntityInfoMsg { Id = e.Id, Kind = e.Kind, Name = e.Name, Circle = "" };
+            var info = new EntityInfoMsg { Id = e.Id, Kind = e.Kind, Name = e.Name, Circle = "", Sire = "" };
             var pe = e as PlayerEntity;
-            if (pe != null) { info.Bloodline = pe.Profile.Bloodline; info.Circle = pe.Profile.Circle; }
+            if (pe != null) { info.Bloodline = pe.Profile.Bloodline; info.Circle = pe.Profile.Circle; info.Sire = NameOf(pe.Profile.Sire); }
             return info;
         }
 
@@ -472,7 +481,9 @@ namespace Sanguine.Server
             if (_now < p.MistUntil) f |= SelfFlags.Mist;
             if (_now < p.MajestyUntil) f |= SelfFlags.Majesty;
             if (_now < p.SilencedUntil) f |= SelfFlags.Silenced;
+            if (p.Bonded) f |= SelfFlags.Bonded;
             m.Flags = f;
+            m.Bloodline = p.Profile.Bloodline;
             m.LearnedGifts = (byte)(p.Profile.Gifts | 1);
             for (int i = 0; i < GameRules.GiftSlots; i++) m.GiftCooldowns[i] = (float)Math.Max(0, p.GiftReadyAt[i] - _now);
             for (int i = 0; i < p.Thralls.Length; i++)

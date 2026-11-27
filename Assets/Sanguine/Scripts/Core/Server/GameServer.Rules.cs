@@ -131,6 +131,8 @@ namespace Sanguine.Server
             {
                 PlayerEntity p = _players[i];
 
+                if (_now >= p.NextBondCheck) { p.NextBondCheck = _now + 0.5; UpdateBond(p); }
+
                 if (p.InTorpor)
                 {
                     if (_now >= p.TorporUntil) Respawn(p);
@@ -172,7 +174,7 @@ namespace Sanguine.Server
                 // Mending: spend blood to heal when out of combat.
                 if (p.Health < p.MaxHealth && p.Blood > 2f && _now - p.LastCombat > 4 && _now >= p.NextMend)
                 {
-                    p.NextMend = _now + 2.0;
+                    p.NextMend = _now + (p.Bonded ? GameRules.BondMendInterval : 2.0);
                     p.Blood -= 0.5f;
                     p.Health = Math.Min(p.MaxHealth, p.Health + 1f);
                 }
@@ -233,6 +235,7 @@ namespace Sanguine.Server
             {
                 Notice(p, NoticeLevel.Danger, "You are MARKED. Any Kindred may destroy you without penalty.");
                 BroadcastSystem(p.Name + " has broken the Hush and is marked for destruction.", p);
+                Shame(p, GameRules.ShameBrokeHush, "has broken the Hush");
             }
         }
 
@@ -346,6 +349,8 @@ namespace Sanguine.Server
                 if (ZoneKindAt(tp.X, tp.Z) == ZoneKind.Haven) return "They are safe within a haven.";
                 if (ZoneKindAt(attacker.X, attacker.Z) == ZoneKind.Haven) return "You cannot attack from within a haven.";
                 if (SameCircle(attacker, tp)) return "They are of your circle.";
+                if (IsDirectKin(attacker, tp))
+                    return "Your blood will not let you raise a hand against your " + (attacker.Profile.Sire == tp.Profile.Key ? "sire." : "childe.");
                 if (_now < tp.MajestyUntil) return "You cannot bring yourself to strike " + tp.Name + ".";
             }
             return null;
@@ -405,7 +410,7 @@ namespace Sanguine.Server
         /// <summary>Area gifts affect rival vampires: not yourself, your circle, or anyone in a safe zone or in mist.</summary>
         private bool IsRivalInReach(PlayerEntity caster, PlayerEntity other, float radius)
         {
-            return other != caster && !other.InTorpor && !SameCircle(caster, other) && _now >= other.MistUntil &&
+            return other != caster && !other.InTorpor && !SameCircle(caster, other) && !IsDirectKin(caster, other) && _now >= other.MistUntil &&
                    ZoneKindAt(other.X, other.Z) == ZoneKind.None && caster.DistanceTo(other) <= radius;
         }
 
@@ -634,6 +639,7 @@ namespace Sanguine.Server
             if (target.IsDown) return;
             var tp = target as PlayerEntity;
             if (tp != null && IsIronSkinned(tp)) amount *= 0.5f;
+            if (tp != null && tp.Bonded) amount *= GameRules.BondDamageTaken;
             target.Health -= amount;
 
             if (tp != null)
@@ -670,6 +676,7 @@ namespace Sanguine.Server
             if (killer.FeedTarget == m.Id) killer.FeedTarget = 0;
             killer.Profile.Kills++;
             LoseConscience(killer, 1f, "a mortal " + how + " by your hand");
+            Shame(killer, GameRules.ShameMortalKill, "has killed a mortal");
             int w = AlarmWitnesses(m.X, m.Z, m, GameRules.WitnessRange);
             AddExposure(killer, 20f + 10f * w, "a body in the street");
         }
@@ -684,6 +691,7 @@ namespace Sanguine.Server
             victim.Standing = Math.Max(0, victim.Standing - 1);
             Notice(victim, NoticeLevel.Danger, "You fall into torpor...");
             foreach (var h in _hunters) if (h.TargetPlayer == victim.Id) h.TargetPlayer = 0;
+            FeelTorpor(victim, killer);
 
             if (killer == null) { BroadcastSystem(victim.Name + " has fallen into torpor.", null); return; }
 
@@ -699,6 +707,7 @@ namespace Sanguine.Server
                 killer.Standing = Math.Max(0, killer.Standing - 5);
                 Notice(killer, NoticeLevel.Danger, "You struck down " + victim.Name + " without cause. You are an OUTLAW for 3 minutes. (-5 standing)");
                 BroadcastSystem(killer.Name + " has struck down " + victim.Name + " and is declared outlaw!", null);
+                Shame(killer, GameRules.ShameOutlaw, "is an outlaw for murder");
             }
         }
     }

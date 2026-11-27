@@ -14,8 +14,10 @@ namespace Sanguine.Client
         private GUIStyle _title, _label, _small, _box, _notice, _worldLabel, _center;
         private Texture2D _white;
         private float _uiScale = 1f;
-        private readonly Rect[] _mouseRects = new Rect[8];
+        private readonly Rect[] _mouseRects = new Rect[12];
         private int _mouseRectCount;
+        private string _confirm = "";      // destructive lineage action awaiting a second click
+        private float _confirmUntil;
 
         private void Start()
         {
@@ -73,6 +75,8 @@ namespace Sanguine.Client
             if (Client.ThrallPanelOpen) DrawThralls(w, h);
             if (Client.HelpOpen) DrawHelp(w, h);
             if (Client.GiftsPanelOpen) DrawGifts(w, h);
+            if (Client.LineagePanelOpen) DrawLineage(w, h);
+            DrawEmbraceOffer(w, h);
 
             // Track whether the mouse is over UI so clicks don't pick targets or orbit the camera.
             // (Event.current.mousePosition is affected by GUI.matrix, so use raw screen coordinates.)
@@ -194,12 +198,14 @@ namespace Sanguine.Client
                 Vector3 sp = cam.WorldToScreenPoint(v.transform.position + Vector3.up * 2.7f);
                 if (sp.z <= 0) continue;
                 string text = v.DisplayName;
+                string kin = Client.KinOf(v);
+                if (kin.Length > 0) text += " - " + kin;
                 if ((v.Flags & EntityFlags.Regent) != 0) text = "Regent " + text;
                 if ((v.Flags & EntityFlags.Down) != 0) text += v.Kind == EntityKind.Player ? " (torpor)" : " (dead)";
                 Rect r = new Rect(sp.x - 120, Screen.height - sp.y - 10, 240, 20);
                 _worldLabel.normal.textColor = Color.black;
                 GUI.Label(new Rect(r.x + 1, r.y + 1, r.width, r.height), text, _worldLabel);
-                _worldLabel.normal.textColor = v.LabelColor;
+                _worldLabel.normal.textColor = kin.Length > 0 && (v.Flags & EntityFlags.Marked) == 0 ? KinColor : v.LabelColor;
                 GUI.Label(r, text, _worldLabel);
                 if (v.Id == Client.TargetId || v.HealthPct < 0.999f)
                     Fill(new Rect(sp.x - 25, Screen.height - sp.y + 10, 50 * v.HealthPct, 3), new Color(0.9f, 0.15f, 0.15f));
@@ -244,7 +250,7 @@ namespace Sanguine.Client
             SelfStateMsg s = Client.Self;
             if (s == null) return;
             BloodlineDef def = Client.MyDef;
-            Rect panel = new Rect(10, 10, 290, 230);
+            Rect panel = new Rect(10, 10, 290, 248);
             Capture(Scale(panel));
             Fill(panel, new Color(0, 0, 0, 0.5f));
             GUILayout.BeginArea(new Rect(panel.x + 8, panel.y + 6, panel.width - 16, panel.height - 10));
@@ -252,9 +258,10 @@ namespace Sanguine.Client
                             ((s.Flags & SelfFlags.Regent) != 0 ? "  <color=#ffcc33>Regent</color>" : ""), _label);
             ZoneDef zone = Client.City != null && Client.Local != null ? Client.City.ZoneAt(Client.Local.transform.position.x, Client.Local.transform.position.z) : null;
             GUILayout.Label(GameData.Districts[Mathf.Clamp(s.District, 0, 3)].Name + (zone != null ? " - " + zone.Name : ""), _small);
+            GUILayout.Label(LineageSummary(), _small);
             GUILayout.EndArea();
 
-            float y = panel.y + 52;
+            float y = panel.y + 70;
             Bar(new Rect(panel.x + 8, y, 274, 18), s.Blood, s.MaxBlood, new Color(0.65f, 0.02f, 0.05f), "Blood " + s.Blood.ToString("0.0") + " / " + s.MaxBlood);
             Bar(new Rect(panel.x + 8, y + 22, 274, 18), s.Health, s.MaxHealth, new Color(0.25f, 0.5f, 0.3f), "Health " + Mathf.CeilToInt(s.Health) + " / " + s.MaxHealth);
             Color expColor = s.Exposure >= GameRules.ExposureMarkedThreshold ? Color.red : (s.Exposure >= GameRules.ExposureHunterThreshold ? new Color(1f, 0.55f, 0f) : new Color(0.7f, 0.6f, 0.2f));
@@ -283,6 +290,7 @@ namespace Sanguine.Client
             AddFlag(flags, s.Flags, SelfFlags.Mist, "Crimson Mist", "ff5050");
             AddFlag(flags, s.Flags, SelfFlags.Majesty, "Majesty", "ffd860");
             AddFlag(flags, s.Flags, SelfFlags.Silenced, "SILENCED", "a0a0ff");
+            AddFlag(flags, s.Flags, SelfFlags.Bonded, "Blood bond", "ff90a8");
             GUI.Label(new Rect(panel.x + 8, y + 108, 274, 60), flags.ToString(), _small);
         }
 
@@ -345,6 +353,9 @@ namespace Sanguine.Client
             if ((t.Flags & EntityFlags.Marked) != 0) fl.Append(" <color=#ff4040>MARKED</color>");
             if ((t.Flags & EntityFlags.Stunned) != 0) fl.Append(" stunned");
             if ((t.Flags & EntityFlags.Down) != 0) fl.Append(" down");
+            string tkin = Client.KinOf(t);
+            if (tkin.Length > 0) fl.Append(" <color=#ff90a8>").Append(tkin).Append("</color>");
+            else if (t.Kind == EntityKind.Player && !string.IsNullOrEmpty(t.Info.Sire)) fl.Append(" childe of ").Append(Escape(t.Info.Sire));
             GUI.Label(new Rect(r.x, r.y + 2, r.width, 22), "<b>" + t.DisplayName + "</b> (" + kind + ") " + dist.ToString("0.0") + "m" + fl, _center);
             Bar(new Rect(r.x + 10, r.y + 28, r.width - 20, 16), t.HealthPct, 1f, new Color(0.7f, 0.1f, 0.1f), "");
         }
@@ -377,8 +388,8 @@ namespace Sanguine.Client
             SelfStateMsg s = Client.Self;
             if (s == null) return;
             BloodlineDef def = Client.MyDef;
-            float bw = 112, bh = 48, gap = 6;
-            float total = bw * 8 + gap * 7;
+            float bw = 104, bh = 48, gap = 5;
+            float total = bw * 9 + gap * 8;
             float x = w / 2 - total / 2, y = h - bh - 10;
             Capture(Scale(new Rect(x, y, total, bh)));
 
@@ -392,13 +403,17 @@ namespace Sanguine.Client
                 GiftDef g = def.Gifts[slot];
                 bool known = Client.KnowsGift(slot);
                 string label = "[" + (slot + 2) + "] " + g.Name + "\n<size=10>" +
-                               (known ? g.Cost + " blood" : "<color=#ff9060>locked: " + g.StandingCost + " standing</color>") + "</size>";
+                               (known ? g.Cost + " blood" : "<color=#ff9060>locked: " + Client.GiftCost(slot) + " standing</color>") + "</size>";
                 if (ActionButton(new Rect(x, y, bw, bh), label, known ? s.GiftCooldowns[slot] : 0f)) Client.UseGift(slot);
                 x += bw + gap;
             }
             if (ActionButton(new Rect(x, y, bw, bh), "[G] Gifts", 0)) Client.GiftsPanelOpen = !Client.GiftsPanelOpen;
             x += bw + gap;
             if (ActionButton(new Rect(x, y, bw, bh), "[T] Thralls", 0)) Client.ThrallPanelOpen = !Client.ThrallPanelOpen;
+            x += bw + gap;
+            bool offer = Client.Lineage != null && !string.IsNullOrEmpty(Client.Lineage.OfferFrom);
+            if (ActionButton(new Rect(x, y, bw, bh), offer ? "[L] Lineage\n<size=10><color=#ff90a8>Embrace offered</color></size>" : "[L] Lineage", 0))
+                Client.LineagePanelOpen = !Client.LineagePanelOpen;
             x += bw + gap;
             if (ActionButton(new Rect(x, y, bw, bh), "[H] Help", 0)) Client.HelpOpen = !Client.HelpOpen;
         }
@@ -437,6 +452,7 @@ namespace Sanguine.Client
                     case ChatChannel.Circle: color = "80d0ff"; break;
                     case ChatChannel.City: color = "ffd080"; break;
                     case ChatChannel.System: color = "c0a0ff"; break;
+                    case ChatChannel.Lineage: color = "ff90a8"; break;
                     default: color = "e0e0e0"; break;
                 }
                 sb.Append("<color=#").Append(color).Append('>');
@@ -475,7 +491,7 @@ namespace Sanguine.Client
             if (Client.ChatOpen)
             {
                 if (GUI.Button(new Rect(input.x, input.y, 70, input.height), _chatChannel.ToString()))
-                    _chatChannel = _chatChannel == ChatChannel.Local ? ChatChannel.Circle : (_chatChannel == ChatChannel.Circle ? ChatChannel.City : ChatChannel.Local);
+                    _chatChannel = NextChannel(_chatChannel);
                 GUI.SetNextControlName("chat");
                 _chatInput = GUI.TextField(new Rect(input.x + 74, input.y, input.width - 74, input.height), _chatInput, 200);
                 GUI.FocusControl("chat");
@@ -542,9 +558,10 @@ namespace Sanguine.Client
                 GUILayout.Label("<b>[" + (g.Slot + 2) + "] " + g.Name + "</b>  <size=11>" + g.Cost + " blood, " + g.Cooldown + "s" +
                                 (g.Target == PowerTarget.Other ? ", " + g.Range + "m, needs a target" : "") + (g.Subtle ? ", subtle" : "") +
                                 "</size>\n<size=12>" + g.Description + "</size>", _label, GUILayout.Width(450));
-                bool canLearn = !known && s.Standing >= g.StandingCost && (g.Slot == 0 || Client.KnowsGift(g.Slot - 1));
+                int cost = Client.GiftCost(g.Slot);
+                bool canLearn = !known && s.Standing >= cost && (g.Slot == 0 || Client.KnowsGift(g.Slot - 1));
                 GUI.enabled = canLearn;
-                string btn = known ? "Known" : "Learn\n<size=10>" + g.StandingCost + " standing</size>";
+                string btn = known ? "Known" : "Learn\n<size=10>" + cost + " standing" + (Client.TaughtBySire(g.Slot) ? ", taught" : "") + "</size>";
                 if (GUILayout.Button(btn, new GUIStyle(GUI.skin.button) { richText = true }, GUILayout.Height(44)))
                 {
                     UiClick();
@@ -554,7 +571,11 @@ namespace Sanguine.Client
                 GUILayout.EndHorizontal();
                 GUILayout.Space(4);
             }
-            GUILayout.Label("<size=11>Subtle gifts do not breach the Hush. Earn standing with thrall missions, justice and district control.</size>", _small);
+            GUILayout.Label("<size=11>Subtle gifts do not breach the Hush. Earn standing with thrall missions, justice and district control." +
+                            (Client.Lineage != null && Client.Lineage.Status == LineageStatus.Tutelage
+                                ? " Your sire teaches the gifts they know for less standing."
+                                : Client.Lineage != null && Client.Lineage.Status == LineageStatus.Fledgling
+                                    ? " <color=#ffd080>Learning your second gift alone means no sire can claim you.</color>" : "") + "</size>", _small);
             if (GUILayout.Button("Close")) Client.GiftsPanelOpen = false;
             GUILayout.EndArea();
         }
@@ -567,7 +588,7 @@ namespace Sanguine.Client
             GUILayout.Label("<b>How to survive the night</b>", _label);
             GUILayout.Label(
                 "<b>Controls</b>: WASD move, right-drag or Q/E turn the camera, mouse wheel zoom. Click or Tab to target. " +
-                "F feed / release, 1 strike, 2-4 your three gifts, G learn gifts, T thralls, Enter chat, Esc clear target.\n\n" +
+                "F feed / release, 1 strike, 2-4 your three gifts, G learn gifts, T thralls, L lineage, Enter chat, Esc clear target.\n\n" +
                 "<b>Gifts</b>: every bloodline has three. The first is innate; the others are learned by spending standing.\n\n" +
                 "<b>Blood</b> drains over time and fuels your gift and healing. Feed on mortals, but release them (F) before " +
                 "their heart stops: killing lowers your <b>Conscience</b>. At 3 or less the Beast rules you and you are Marked.\n\n" +
@@ -577,8 +598,167 @@ namespace Sanguine.Client
                 "an innocent one makes you an Outlaw. Circle members cannot harm each other.\n\n" +
                 "<b>Dawn</b>: be inside a haven or sanctum when the sun rises, or burn.\n\n" +
                 "<b>Politics</b>: /circle create to found a faction, send thralls to win districts, /vote for a Regent each night. " +
-                "The Regent may /edict and call one /hunt per night.", _small);
+                "The Regent may /edict and call one /hunt per night.\n\n" +
+                "<b>Lineage</b>: a fledgling can accept the Embrace from an elder who knows their second gift, and joins the sire's " +
+                "bloodline. The sire teaches gifts for less standing and answers for the childe's crimes until releasing them. " +
+                "Sire and childe cannot harm each other and are stronger together (L, /lin).", _small);
             if (GUILayout.Button("Close")) Client.HelpOpen = false;
+            GUILayout.EndArea();
+        }
+
+        // ------------------------------------------------------------------
+        // Lineage
+        // ------------------------------------------------------------------
+
+        private static readonly Color KinColor = new Color(1f, 0.62f, 0.72f);
+
+        private static ChatChannel NextChannel(ChatChannel c)
+        {
+            switch (c)
+            {
+                case ChatChannel.Local: return ChatChannel.Circle;
+                case ChatChannel.Circle: return ChatChannel.Lineage;
+                case ChatChannel.Lineage: return ChatChannel.City;
+                default: return ChatChannel.Local;
+            }
+        }
+
+        private string LineageSummary()
+        {
+            LineageMsg l = Client.Lineage;
+            if (l == null) return "";
+            string childer = l.Childer.Length > 0 ? " - sire of " + l.Childer.Length : "";
+            switch (l.Status)
+            {
+                case LineageStatus.Fledgling: return "<color=#ffd080>Fledgling</color> <color=#999999>(L: lineage)</color>";
+                case LineageStatus.Tutelage: return "<color=#ff90a8>Childe of " + Escape(l.Sire.Name) + "</color> (tutelage)" + childer;
+                case LineageStatus.Released: return "<color=#ff90a8>Childe of " + Escape(l.Sire.Name) + "</color>" + childer;
+                default: return "<color=#999999>Unclaimed</color>" + childer;
+            }
+        }
+
+        /// <summary>Two-click confirmation for actions that cut the family tree.</summary>
+        private bool Confirmed(string key)
+        {
+            if (_confirm == key && Time.time < _confirmUntil) { _confirm = ""; return true; }
+            _confirm = key;
+            _confirmUntil = Time.time + 4f;
+            return false;
+        }
+
+        private string ConfirmLabel(string key, string label)
+        {
+            return _confirm == key && Time.time < _confirmUntil ? "<color=#ff6060>Confirm?</color>" : label;
+        }
+
+        private static string Dot(bool online)
+        {
+            return online ? " <color=#80ff80>*</color>" : " <color=#666666>*</color>";
+        }
+
+        private void DrawLineage(float w, float h)
+        {
+            LineageMsg l = Client.Lineage;
+            Rect r = new Rect(w / 2 - 300, h - 480, 600, 390);
+            Capture(Scale(r));
+            GUILayout.BeginArea(r, _box);
+            GUILayout.Label("<b>Lineage</b> - blood of one blood.  <size=11><color=#80ff80>*</color> awake</size>", _label);
+            if (l == null) { GUILayout.Label("Waiting for the court's records...", _small); GUILayout.EndArea(); return; }
+            var button = new GUIStyle(GUI.skin.button) { richText = true };
+
+            switch (l.Status)
+            {
+                case LineageStatus.Fledgling:
+                    GUILayout.Label("<color=#ffd080><b>Fledgling.</b></color> No sire has claimed you. An elder who knows their second gift may offer you " +
+                                    "the Embrace: you would join their bloodline, they would teach you gifts for less standing and answer for your " +
+                                    "crimes. Once you learn your second gift alone, no one can claim you.", _small);
+                    break;
+                case LineageStatus.Unclaimed:
+                    GUILayout.Label("<b>Unclaimed.</b> You came into your power alone.", _small);
+                    break;
+                default:
+                    GUILayout.Label("Childe of <b>" + Escape(l.Sire.Name) + "</b>" + Dot(l.Sire.Online) +
+                                    (l.Status == LineageStatus.Tutelage
+                                        ? " - <i>in tutelage</i>. Your sire teaches you gifts they know for less standing and answers for your " +
+                                          "crimes. Learn all three gifts and they may release you."
+                                        : " - <i>released</i>."), _small);
+                    break;
+            }
+            if (l.Ancestors.Length > 0) GUILayout.Label("Your line: " + Escape(l.Sire.Name) + " < " + Escape(string.Join(" < ", l.Ancestors)), _small);
+            if (l.Siblings.Length > 0) GUILayout.Label("Siblings: " + Escape(string.Join(", ", l.Siblings)), _small);
+            if (l.Family.Length > 1) GUILayout.Label("Family: " + l.Family.Length + " Kindred, " + l.FamilyOnline + " awake. Speak to them with /lin (or the Lineage chat channel).", _small);
+
+            if (l.Childer.Length > 0)
+            {
+                GUILayout.Space(4);
+                GUILayout.Label("<b>Your childer</b>", _label);
+                foreach (KinInfo c in l.Childer)
+                {
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label(Escape(c.Name) + Dot(c.Online) + "  <size=11>" + (c.Released ? "released" : "tutelage, " + c.GiftsKnown + "/3 gifts") + "</size>",
+                                    _small, GUILayout.Width(330));
+                    GUI.enabled = !c.Released && c.GiftsKnown >= GameRules.GiftSlots;
+                    if (GUILayout.Button("Release <size=10>+" + GameRules.ReleaseStanding + "</size>", button, GUILayout.Width(100)))
+                    { UiClick(); Client.SendChat(ChatChannel.Local, "/lineage release " + c.Name); }
+                    GUI.enabled = true;
+                    if (GUILayout.Button(ConfirmLabel("disown:" + c.Name, "Disown"), button, GUILayout.Width(100)))
+                    { UiClick(); if (Confirmed("disown:" + c.Name)) Client.SendChat(ChatChannel.Local, "/lineage disown " + c.Name); }
+                    GUILayout.EndHorizontal();
+                }
+            }
+
+            GUILayout.Space(6);
+            EntityView t = Client.Target;
+            if (l.CanSire)
+            {
+                bool player = t != null && t.Kind == EntityKind.Player && !string.IsNullOrEmpty(t.Info.Name);
+                bool unsired = player && string.IsNullOrEmpty(t.Info.Sire);
+                GUI.enabled = unsired;
+                string label = unsired ? "Offer the Embrace to " + Escape(t.Info.Name) + " <size=10>(" + GameRules.EmbraceBloodCost + " blood)</size>"
+                                       : "Offer the Embrace <size=10>(target a fledgling)</size>";
+                if (GUILayout.Button(label, button, GUILayout.Height(30))) { UiClick(); Client.OfferEmbrace(t); }
+                GUI.enabled = true;
+                GUILayout.Label("<size=11>Stand beside an unclaimed fledgling. Up to " + GameRules.MaxChilderInTutelage + " childer in tutelage at a time.</size>", _small);
+            }
+            else if (l.Status != LineageStatus.Fledgling)
+                GUILayout.Label("<size=11>You may sire once you know your second gift and are free of tutelage (at most " +
+                                GameRules.MaxChilderInTutelage + " childer in tutelage).</size>", _small);
+
+            GUILayout.Label("<size=11>Sire and childe cannot harm each other. Within " + GameRules.BondRange + " m they share the blood bond: " +
+                            "faster mending and " + Mathf.RoundToInt((1f - GameRules.BondDamageTaken) * 100f) + "% less harm. Each feels the other fall.</size>", _small);
+            GUILayout.FlexibleSpace();
+            GUILayout.BeginHorizontal();
+            if (l.Status == LineageStatus.Tutelage || l.Status == LineageStatus.Released)
+            {
+                if (GUILayout.Button(ConfirmLabel("renounce", "Renounce your sire"), button, GUILayout.Width(180)))
+                { UiClick(); if (Confirmed("renounce")) Client.SendChat(ChatChannel.Local, "/lineage renounce"); }
+            }
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Close", GUILayout.Width(100))) Client.LineagePanelOpen = false;
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
+        }
+
+        private void DrawEmbraceOffer(float w, float h)
+        {
+            LineageMsg l = Client.Lineage;
+            if (l == null || string.IsNullOrEmpty(l.OfferFrom)) return;
+            float left = l.OfferSeconds - (Time.time - Client.LineageReceivedAt);
+            if (left <= 0f) return;
+            BloodlineDef def = GameData.GetBloodline(l.OfferBloodline);
+            Rect r = new Rect(w / 2 - 240, h * 0.45f, 480, 140);
+            Capture(Scale(r));
+            Fill(r, new Color(0.12f, 0f, 0.02f, 0.85f));
+            GUILayout.BeginArea(new Rect(r.x + 10, r.y + 8, r.width - 20, r.height - 14));
+            GUILayout.Label("<b>" + Escape(l.OfferFrom) + "</b> offers you the Embrace", _center);
+            GUILayout.Label("Accept and " + Escape(l.OfferFrom) + " becomes your sire. You are remade as one of the <color=#" +
+                            ColorUtility.ToHtmlStringRGB(Mats.BloodlineColor(def.Id)) + ">" + def.Name + "</color> (" + def.Epithet +
+                            "), with " + def.Gifts[0].Name + " as your innate gift. <size=11>(" + Mathf.CeilToInt(left) + "s)</size>", _small);
+            GUILayout.FlexibleSpace();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Accept the Embrace", GUILayout.Height(30))) { UiClick(); Client.SendChat(ChatChannel.Local, "/accept"); }
+            if (GUILayout.Button("Refuse", GUILayout.Height(30), GUILayout.Width(120))) { UiClick(); Client.SendChat(ChatChannel.Local, "/refuse"); }
+            GUILayout.EndHorizontal();
             GUILayout.EndArea();
         }
 

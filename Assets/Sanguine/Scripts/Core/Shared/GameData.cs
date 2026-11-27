@@ -87,7 +87,7 @@ namespace Sanguine
 
     public static class GameRules
     {
-        public const int ProtocolVersion = 4;
+        public const int ProtocolVersion = 5;
         public const int DefaultPort = 7777;
 
         // Movement
@@ -126,6 +126,23 @@ namespace Sanguine
         public const int GiftSlots = 3;
         /// <summary>Standing spent to learn the gift in each slot (slot 0 is innate).</summary>
         public static readonly int[] GiftStandingCost = { 0, 5, 12 };
+
+        // Lineage: the Embrace, sires and childer
+        /// <summary>Standing a childe in tutelage pays to learn a gift its sire knows (instead of GiftStandingCost).</summary>
+        public static readonly int[] TaughtGiftStandingCost = { 0, 3, 7 };
+        public const float EmbraceRange = 3f;
+        public const float EmbraceBloodCost = 3f;
+        public const float EmbraceOfferSeconds = 60f;
+        public const int MaxChilderInTutelage = 3;
+        /// <summary>Sire and childe within this distance share the blood bond.</summary>
+        public const float BondRange = 20f;
+        public const float BondDamageTaken = 0.8f;
+        public const float BondMendInterval = 1f;
+        public const int TeachStanding = 1;
+        public const int ReleaseStanding = 3;
+        public const int ShameMortalKill = 1;
+        public const int ShameBrokeHush = 1;
+        public const int ShameOutlaw = 2;
 
         // Thralls
         public const int ThrallsPerPlayer = 2;

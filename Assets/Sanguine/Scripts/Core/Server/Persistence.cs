@@ -23,6 +23,10 @@ namespace Sanguine.Server
         public int Kills, Feedings, Missions;
         /// <summary>Bit mask of learned gift slots; slot 0 (bit 0) is innate.</summary>
         public int Gifts = 1;
+        /// <summary>Profile key of the vampire who Embraced this one, or empty.</summary>
+        public string Sire = "";
+        /// <summary>True once the sire has released this childe from tutelage.</summary>
+        public bool Released;
 
         public string Key { get { return Store.KeyOf(Name); } }
 
@@ -66,6 +70,8 @@ namespace Sanguine.Server
             Kv(sb, "feedings", Feedings.ToString(CultureInfo.InvariantCulture));
             Kv(sb, "missions", Missions.ToString(CultureInfo.InvariantCulture));
             Kv(sb, "gifts", Gifts.ToString(CultureInfo.InvariantCulture));
+            Kv(sb, "sire", Sire);
+            Kv(sb, "released", Released ? "1" : "0");
             return sb.ToString();
         }
 
@@ -88,6 +94,8 @@ namespace Sanguine.Server
             p.Feedings = Store.ParseInt(Get(d, "feedings", "0"));
             p.Missions = Store.ParseInt(Get(d, "missions", "0"));
             p.Gifts = Store.ParseInt(Get(d, "gifts", "1")) | 1;
+            p.Sire = Store.KeyOf(Get(d, "sire", ""));
+            p.Released = Get(d, "released", "0") == "1";
             return p;
         }
 

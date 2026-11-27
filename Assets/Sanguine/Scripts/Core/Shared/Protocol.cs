@@ -27,9 +27,19 @@ namespace Sanguine
         Teleport = 106,
         WorldState = 107,
         Notice = 108,
+        Lineage = 109,
     }
 
-    public enum ChatChannel : byte { Local = 0, Circle = 1, City = 2, System = 3 }
+    public enum ChatChannel : byte { Local = 0, Circle = 1, City = 2, System = 3, Lineage = 4 }
+
+    /// <summary>Where a vampire stands in their line.</summary>
+    public enum LineageStatus : byte
+    {
+        Fledgling = 0,   // no sire and no second gift yet: may still be Embraced
+        Unclaimed = 1,   // came into their power without a sire
+        Tutelage = 2,    // childe still under their sire's tutelage
+        Released = 3,    // childe released by their sire
+    }
 
     public enum NoticeLevel : byte { Info = 0, Good = 1, Warning = 2, Danger = 3 }
 
@@ -73,6 +83,7 @@ namespace Sanguine
         Mist = 1 << 16,
         Majesty = 1 << 17,
         Silenced = 1 << 18,
+        Bonded = 1 << 19,      // sire or childe nearby: the blood bond
     }
 
     public enum ThrallState : byte { Idle = 0, OnMission = 1, Recovering = 2 }
@@ -220,15 +231,20 @@ namespace Sanguine
         public string Name;
         public Bloodline Bloodline;
         public string Circle;
+        /// <summary>Name of the vampire's sire, or empty.</summary>
+        public string Sire;
 
         public byte[] Write()
         {
-            return new PacketWriter(Msg.EntityInfo).Int(Id).Byte((byte)Kind).Str(Name).Byte((byte)Bloodline).Str(Circle).ToArray();
+            return new PacketWriter(Msg.EntityInfo).Int(Id).Byte((byte)Kind).Str(Name).Byte((byte)Bloodline).Str(Circle).Str(Sire).ToArray();
         }
 
         public static EntityInfoMsg Read(PacketReader r)
         {
-            return new EntityInfoMsg { Id = r.Int(), Kind = (EntityKind)r.Byte(), Name = r.Str(), Bloodline = (Bloodline)r.Byte(), Circle = r.Str() };
+            return new EntityInfoMsg
+            {
+                Id = r.Int(), Kind = (EntityKind)r.Byte(), Name = r.Str(), Bloodline = (Bloodline)r.Byte(), Circle = r.Str(), Sire = r.Str()
+            };
         }
     }
 
@@ -244,6 +260,8 @@ namespace Sanguine
         public float Blood, MaxBlood, Health, MaxHealth, Conscience, Exposure;
         public int Standing;
         public SelfFlags Flags;
+        /// <summary>Current bloodline (it changes when a fledgling is Embraced into another line).</summary>
+        public Bloodline Bloodline;
         public float AttackCooldown;
         /// <summary>Remaining cooldown of each gift slot.</summary>
         public float[] GiftCooldowns = new float[GameRules.GiftSlots];
@@ -257,7 +275,7 @@ namespace Sanguine
         {
             var w = new PacketWriter(Msg.SelfState)
                 .Float(Blood).Float(MaxBlood).Float(Health).Float(MaxHealth).Float(Conscience).Float(Exposure)
-                .Int(Standing).Int((int)Flags).Float(AttackCooldown).Int(FeedTarget).Byte(District).Byte(LearnedGifts);
+                .Int(Standing).Int((int)Flags).Byte((byte)Bloodline).Float(AttackCooldown).Int(FeedTarget).Byte(District).Byte(LearnedGifts);
             for (int i = 0; i < GiftCooldowns.Length; i++) w.Float(GiftCooldowns[i]);
             w.Byte((byte)Thralls.Length);
             for (int i = 0; i < Thralls.Length; i++)
@@ -271,7 +289,7 @@ namespace Sanguine
             {
                 Blood = r.Float(), MaxBlood = r.Float(), Health = r.Float(), MaxHealth = r.Float(),
                 Conscience = r.Float(), Exposure = r.Float(), Standing = r.Int(), Flags = (SelfFlags)r.Int(),
-                AttackCooldown = r.Float(), FeedTarget = r.Int(), District = r.Byte(), LearnedGifts = r.Byte()
+                Bloodline = (Bloodline)r.Byte(), AttackCooldown = r.Float(), FeedTarget = r.Int(), District = r.Byte(), LearnedGifts = r.Byte()
             };
             for (int i = 0; i < m.GiftCooldowns.Length; i++) m.GiftCooldowns[i] = r.Float();
             int n = r.Byte();
@@ -319,6 +337,88 @@ namespace Sanguine
             m.TopCandidates = new string[c];
             for (int i = 0; i < c; i++) m.TopCandidates[i] = r.Str();
             return m;
+        }
+    }
+
+    /// <summary>A sire or childe as seen in the lineage panel.</summary>
+    public struct KinInfo
+    {
+        public string Name;
+        public bool Online;
+        public bool Released;     // childer only: released from tutelage
+        public byte GiftsKnown;   // 1-3
+    }
+
+    /// <summary>The player's own place in the family tree. Sent on change and every couple of seconds.</summary>
+    public sealed class LineageMsg
+    {
+        public LineageStatus Status;
+        public KinInfo Sire;                              // Name empty when there is no sire
+        public string[] Ancestors = new string[0];        // grandsire first, then further back
+        public string[] Siblings = new string[0];         // the sire's other childer
+        public KinInfo[] Childer = new KinInfo[0];
+        /// <summary>Every member of the family (the whole tree under the eldest ancestor), for nameplates.</summary>
+        public string[] Family = new string[0];
+        public int FamilyOnline;
+        public bool CanSire;
+        public string OfferFrom = "";                     // a pending Embrace offer
+        public Bloodline OfferBloodline;
+        public float OfferSeconds;
+
+        public byte[] Write()
+        {
+            var w = new PacketWriter(Msg.Lineage).Byte((byte)Status);
+            WriteKin(w, Sire);
+            WriteStrings(w, Ancestors);
+            WriteStrings(w, Siblings);
+            w.Byte((byte)Childer.Length);
+            for (int i = 0; i < Childer.Length; i++) WriteKin(w, Childer[i]);
+            WriteStrings(w, Family);
+            w.Int(FamilyOnline).Bool(CanSire).Str(OfferFrom).Byte((byte)OfferBloodline).Float(OfferSeconds);
+            return w.ToArray();
+        }
+
+        public static LineageMsg Read(PacketReader r)
+        {
+            var m = new LineageMsg { Status = (LineageStatus)r.Byte() };
+            m.Sire = ReadKin(r);
+            m.Ancestors = ReadStrings(r);
+            m.Siblings = ReadStrings(r);
+            int n = r.Byte();
+            m.Childer = new KinInfo[n];
+            for (int i = 0; i < n; i++) m.Childer[i] = ReadKin(r);
+            m.Family = ReadStrings(r);
+            m.FamilyOnline = r.Int();
+            m.CanSire = r.Bool();
+            m.OfferFrom = r.Str();
+            m.OfferBloodline = (Bloodline)r.Byte();
+            m.OfferSeconds = r.Float();
+            return m;
+        }
+
+        private static void WriteKin(PacketWriter w, KinInfo k)
+        {
+            w.Str(k.Name).Bool(k.Online).Bool(k.Released).Byte(k.GiftsKnown);
+        }
+
+        private static KinInfo ReadKin(PacketReader r)
+        {
+            return new KinInfo { Name = r.Str(), Online = r.Bool(), Released = r.Bool(), GiftsKnown = r.Byte() };
+        }
+
+        private static void WriteStrings(PacketWriter w, string[] a)
+        {
+            int n = Math.Min(a.Length, 255);
+            w.Byte((byte)n);
+            for (int i = 0; i < n; i++) w.Str(a[i]);
+        }
+
+        private static string[] ReadStrings(PacketReader r)
+        {
+            int n = r.Byte();
+            var a = new string[n];
+            for (int i = 0; i < n; i++) a[i] = r.Str();
+            return a;
         }
     }
 

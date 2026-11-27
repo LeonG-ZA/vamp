@@ -85,6 +85,13 @@ namespace Sanguine.Server
         public double NextHunterCheck;
         public bool WarnedFaltering;
 
+        // Lineage
+        public string EmbraceOfferFrom = "";   // profile key of a vampire offering the Embrace
+        public double EmbraceOfferUntil;
+        public bool Bonded;                    // sire or childe close by
+        public double NextBondCheck, BondNoticeAt;
+        public bool LineageDirty = true;
+
         public readonly Thrall[] Thralls = new Thrall[GameRules.ThrallsPerPlayer];
         public readonly HashSet<int> Known = new HashSet<int>();
 

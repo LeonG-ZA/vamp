@@ -32,6 +32,9 @@ namespace Sanguine.Server
                     byte[] cm = SimpleMsg.ChatMsg(ChatChannel.Circle, p.Name, text);
                     foreach (var o in _players) if (SameCircle(o, p) || o == p) o.Session.Send(cm);
                     break;
+                case ChatChannel.Lineage:
+                    LineageChat(p, text);
+                    break;
                 case ChatChannel.City:
                     byte[] gm = SimpleMsg.ChatMsg(ChatChannel.City, p.Name, text);
                     foreach (var o in _players) o.Session.Send(gm);
@@ -67,6 +70,11 @@ namespace Sanguine.Server
                 case "gifts": CmdGifts(p); break;
                 case "learn": CmdLearn(p, rest); break;
                 case "districts": CmdDistricts(p); break;
+                case "lin": HandleChat(p, ChatChannel.Lineage, rest); break;
+                case "embrace": CmdEmbrace(p, arg1); break;
+                case "accept": CmdAccept(p); break;
+                case "refuse": CmdRefuse(p); break;
+                case "lineage": case "line": CmdLineage(p, parts); break;
                 default:
                     if (_cfg.DebugCommands && HandleDebugCommand(p, cmd, parts)) break;
                     SystemMsg(p, "Unknown command. Try /help.");
@@ -76,12 +84,13 @@ namespace Sanguine.Server
 
         private void CmdHelp(PlayerEntity p)
         {
-            SystemMsg(p, "Chat: /say /c (circle) /city   Info: /who /stats /districts");
+            SystemMsg(p, "Chat: /say /c (circle) /lin (lineage) /city   Info: /who /stats /districts /lineage");
             SystemMsg(p, "Circles: /circle create <name> | invite <player> | join <name> | leave | kick <player> | info");
             SystemMsg(p, "Politics: /vote <player> (Regent chosen at dawn, votes weighted by standing)");
             SystemMsg(p, "Regent only: /hunt <player> (declare a blood hunt)  /edict <text>");
             SystemMsg(p, "Thralls: /thrall <1-4|district> sends a ghoul servant to sway a district.");
             SystemMsg(p, "Gifts: /gifts lists your bloodline's gifts; /learn <2|3|name> spends standing to learn one.");
+            SystemMsg(p, "Lineage: /embrace <fledgling>, /accept or /refuse an offer, /lineage [release|disown <childe> | renounce].");
         }
 
         private void CmdWho(PlayerEntity p)
@@ -93,6 +102,7 @@ namespace Sanguine.Server
                 if (i > 0) sb.Append(", ");
                 sb.Append(o.Name).Append(" [").Append(o.Def.Name).Append(']');
                 if (o.Profile.Circle.Length > 0) sb.Append(" <").Append(o.Profile.Circle).Append('>');
+                if (o.Profile.Sire.Length > 0) sb.Append(" childe of ").Append(NameOf(o.Profile.Sire));
                 if (IsRegent(o)) sb.Append(" (Regent)");
             }
             SystemMsg(p, sb.ToString());
@@ -115,7 +125,9 @@ namespace Sanguine.Server
             SystemMsg(p, "Gifts of the " + p.Def.Name + " (standing " + p.Standing + "):");
             foreach (GiftDef g in p.Def.Gifts)
             {
-                string state = p.HasGift(g.Slot) ? "known" : "learn for " + g.StandingCost + " standing";
+                PlayerProfile teacher;
+                int cost = GiftCostFor(p, g, out teacher);
+                string state = p.HasGift(g.Slot) ? "known" : "learn for " + cost + " standing" + (teacher != null ? ", taught by " + teacher.Name : "");
                 SystemMsg(p, string.Format(CultureInfo.InvariantCulture, "{0}. {1} [{2}] - {3} ({4} blood, {5}s)",
                     g.Tier, g.Name, state, g.Description, g.Cost, g.Cooldown));
             }
@@ -132,16 +144,35 @@ namespace Sanguine.Server
             if (gift == null) { SystemMsg(p, "Usage: /learn <2|3|gift name>. See /gifts."); return; }
             if (p.HasGift(gift.Slot)) { SystemMsg(p, "You already know " + gift.Name + "."); return; }
             if (gift.Slot > 1 && !p.HasGift(gift.Slot - 1)) { SystemMsg(p, "Learn " + p.Def.Gifts[gift.Slot - 1].Name + " first."); return; }
-            if (p.Standing < gift.StandingCost)
+            PlayerProfile teacher;
+            int cost = GiftCostFor(p, gift, out teacher);
+            if (p.Standing < cost)
             {
-                SystemMsg(p, gift.Name + " costs " + gift.StandingCost + " standing; you have " + p.Standing + ".");
+                SystemMsg(p, gift.Name + " costs " + cost + " standing; you have " + p.Standing + ".");
                 return;
             }
-            p.Standing -= gift.StandingCost;
+            bool wasFledgling = IsFledgling(p.Profile);
+            p.Standing -= cost;
             p.Profile.Gifts |= 1 << gift.Slot;
             _store.SaveProfile(p.Profile);
-            Notice(p, NoticeLevel.Good, "Your elders teach you " + gift.Name + ". (-" + gift.StandingCost + " standing)");
+            if (teacher != null)
+            {
+                teacher.Standing += GameRules.TeachStanding;
+                PlayerEntity to = OnlineByKey(teacher.Key);
+                if (to != null) Notice(to, NoticeLevel.Good, "You teach " + gift.Name + " to your childe " + p.Name + ". (+" + GameRules.TeachStanding + " standing)");
+                else _store.SaveProfile(teacher);
+                Notice(p, NoticeLevel.Good, "Your sire " + teacher.Name + " teaches you " + gift.Name + ". (-" + cost + " standing)");
+                p.LineageDirty = true;
+                if (to != null) to.LineageDirty = true;
+            }
+            else Notice(p, NoticeLevel.Good, "Your elders teach you " + gift.Name + ". (-" + cost + " standing)");
             SystemMsg(p, gift.Name + ": " + gift.Description + " Use it with key " + (gift.Slot + 2) + ".");
+            if (wasFledgling)
+            {
+                p.EmbraceOfferFrom = "";
+                SystemMsg(p, "You came into your power alone: you are Unclaimed now. No sire can claim you, but you may /embrace fledglings of your own.");
+                MarkLineageDirty();
+            }
         }
 
         private void CmdDistricts(PlayerEntity p)

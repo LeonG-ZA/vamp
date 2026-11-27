@@ -17,6 +17,7 @@ namespace Sanguine.Tests
         public string LoginError;
         public SelfStateMsg Self;
         public WorldStateMsg World;
+        public LineageMsg Lineage;
         public readonly List<EntityState> Entities = new List<EntityState>();
         public readonly Dictionary<int, EntityInfoMsg> Infos = new Dictionary<int, EntityInfoMsg>();
         public readonly List<string> Notices = new List<string>();
@@ -46,6 +47,7 @@ namespace Sanguine.Tests
                     case Msg.LoginFailed: LoginError = r.Str(); break;
                     case Msg.SelfState: Self = SelfStateMsg.Read(r); break;
                     case Msg.WorldState: World = WorldStateMsg.Read(r); break;
+                    case Msg.Lineage: Lineage = LineageMsg.Read(r); break;
                     case Msg.Snapshot: SnapshotMsg.Read(r, Entities); break;
                     case Msg.EntityInfo: var info = EntityInfoMsg.Read(r); Infos[info.Id] = info; break;
                     case Msg.Notice: r.Byte(); Notices.Add(r.Str()); break;
@@ -345,6 +347,90 @@ namespace Sanguine.Tests
                 corvin.Conn.Send(SimpleMsg.Attack(alaric.Id));
                 Check(corvin.WaitFor(() => corvin.HasNotice("passes through crimson mist"), 2), "mist cannot be struck");
 
+                // --- Lineage -----------------------------------------------------------
+                Console.WriteLine("[lineage]");
+                var dorian = new Bot("Dorian"); dorian.Connect(port, "secret4", Bloodline.Sylphine);
+                Check(dorian.WaitFor(() => dorian.Welcomed && dorian.Self != null && dorian.Lineage != null, 5) &&
+                      dorian.Lineage.Status == LineageStatus.Fledgling && !dorian.Lineage.CanSire, "a new character is a fledgling");
+                Check(alaric.WaitFor(() => alaric.Lineage != null && alaric.Lineage.CanSire && alaric.Lineage.Status == LineageStatus.Unclaimed, 3),
+                      "a vampire who knows their second gift may sire");
+                dorian.Say("/embrace Corvin");
+                Check(dorian.WaitFor(() => dorian.HasChat("second gift may sire"), 3), "a fledgling cannot sire");
+                alaric.Say("/setblood 10");
+                Thread.Sleep(1100);
+                alaric.Say("/embrace Dorian");
+                Check(alaric.WaitFor(() => alaric.HasChat("Stand beside Dorian"), 3), "the Embrace needs the fledgling at your side");
+                dorian.Say("/tp -101.5 4");
+                Thread.Sleep(1100);
+                alaric.Say("/embrace Dorian");
+                Check(dorian.WaitFor(() => dorian.HasNotice("offers you the Embrace") && dorian.Lineage.OfferFrom == "Alaric" &&
+                                           dorian.Lineage.OfferBloodline == Bloodline.Ashborn, 3), "Dorian is offered the Embrace");
+                dorian.Say("/accept");
+                Check(dorian.WaitFor(() => dorian.Self.Bloodline == Bloodline.Ashborn && dorian.Lineage.Sire.Name == "Alaric" &&
+                                           dorian.Lineage.Status == LineageStatus.Tutelage && dorian.Self.LearnedGifts == 1, 3),
+                      "accepting makes Dorian Alaric's childe, remade as Ashborn");
+                Check(alaric.WaitFor(() => alaric.Lineage.Childer.Length == 1 && alaric.Lineage.Childer[0].Name == "Dorian" && alaric.Self.Blood <= 7.1f, 3),
+                      "Alaric gains a childe and shares 3 blood (" + alaric.Self.Blood.ToString("0.0") + " left)");
+                Check(corvin.WaitFor(() => corvin.Infos.ContainsKey(dorian.Id) && corvin.Infos[dorian.Id].Sire == "Alaric" &&
+                                           corvin.Infos[dorian.Id].Bloodline == Bloodline.Ashborn, 3), "others see Dorian's new bloodline and sire");
+                Check(dorian.WaitFor(() => dorian.Flag(SelfFlags.Bonded), 3) && alaric.WaitFor(() => alaric.Flag(SelfFlags.Bonded), 3),
+                      "sire and childe side by side share the blood bond");
+                Thread.Sleep(1100);
+                dorian.Say("/lin Thank you, sire");
+                Check(alaric.WaitFor(() => alaric.HasChat("Thank you, sire"), 3) && !corvin.WaitFor(() => corvin.HasChat("Thank you, sire"), 0.5),
+                      "lineage chat reaches the family only");
+                dorian.Conn.Send(SimpleMsg.Attack(alaric.Id));
+                Check(dorian.WaitFor(() => dorian.HasNotice("against your sire"), 2), "a childe cannot strike their sire");
+                beatrix.Say("/embrace Dorian");
+                Check(beatrix.WaitFor(() => beatrix.HasChat("already has a sire"), 3), "a childe cannot be claimed twice");
+
+                dorian.Say("/setstanding 3");
+                Thread.Sleep(1100);
+                alaric.WaitFor(() => false, 0.3);
+                int teacherBefore = alaric.Self.Standing;
+                dorian.Say("/learn 2");
+                Check(dorian.WaitFor(() => (dorian.Self.LearnedGifts & 2) != 0 && dorian.Self.Standing == 0, 3),
+                      "Alaric teaches Dorian Siphon for 3 standing instead of 5");
+                Check(alaric.WaitFor(() => alaric.Self.Standing == teacherBefore + 1, 3), "the sire gains standing for teaching");
+                Thread.Sleep(1100);
+                dorian.Say("/embrace Corvin");
+                Check(dorian.WaitFor(() => dorian.HasChat("still in your sire's tutelage"), 3), "a childe in tutelage cannot sire");
+
+                // A childe's crime shames the sire.
+                int shamedBefore = alaric.Self.Standing;
+                bool killed = false;
+                for (int attempt = 0; attempt < 4 && !killed; attempt++)
+                {
+                    Thread.Sleep(1100);
+                    dorian.Say("/tp " + (-150 + attempt * 40) + " 0");
+                    dorian.WaitFor(() => false, 0.5);
+                    EntityState? prey = null;
+                    foreach (var e in dorian.Entities)
+                        if (e.Kind == EntityKind.Mortal && (e.Flags & (EntityFlags.Down | EntityFlags.Feeding)) == 0 &&
+                            Entity.Dist(e.X, e.Z, dorian.X, dorian.Z) < 12f) { prey = e; break; }
+                    if (prey == null) continue;
+                    dorian.Conn.Send(SimpleMsg.Power(0, prey.Value.Id)); // Blood Lash: 3 damage kills a mortal
+                    killed = alaric.WaitFor(() => alaric.HasNotice("has killed a mortal"), 1.5);
+                }
+                Check(killed && alaric.WaitFor(() => alaric.Self.Standing < shamedBefore, 2),
+                      "the sire answers for the childe's kill (" + shamedBefore + " -> " + alaric.Self.Standing + " standing)");
+                Thread.Sleep(1100);
+                dorian.Say("/setexposure 0");
+
+                Thread.Sleep(1100);
+                alaric.Say("/lineage release Dorian");
+                Check(alaric.WaitFor(() => alaric.HasChat("must know all three gifts"), 3), "a childe must know all three gifts to be released");
+                dorian.Say("/setstanding 7");
+                Thread.Sleep(1100);
+                dorian.Say("/learn 3");
+                Check(dorian.WaitFor(() => dorian.Self.LearnedGifts == 7 && dorian.Self.Standing == 0, 3), "Dorian learns Crimson Mist from his sire for 7");
+                Thread.Sleep(1100);
+                alaric.WaitFor(() => false, 0.3);
+                int releaseBefore = alaric.Self.Standing;
+                alaric.Say("/lineage release Dorian");
+                Check(dorian.WaitFor(() => dorian.Lineage.Status == LineageStatus.Released && dorian.Lineage.CanSire, 3) &&
+                      alaric.WaitFor(() => alaric.Self.Standing == releaseBefore + 3, 3), "Alaric releases Dorian (+3 standing); Dorian may now sire");
+
                 // --- Persistence -----------------------------------------------------
                 Console.WriteLine("[persistence]");
                 int standing = alaric.Self.Standing;
@@ -366,6 +452,16 @@ namespace Sanguine.Tests
                 Check(again.World.Regent == "Alaric", "Regent persisted");
                 Check(again.Self.LearnedGifts == 7, "learned gifts persisted");
                 Check(again.WaitFor(() => again.Entities.Exists(e => e.Kind == EntityKind.Mortal), 3), "mortals repopulate after restart");
+                Check(again.WaitFor(() => again.Lineage != null && again.Lineage.Childer.Length == 1 && again.Lineage.Childer[0].Released, 3),
+                      "lineage persisted (Alaric's childe Dorian, released)");
+                var dorian2 = new Bot("Dorian"); dorian2.Connect(port, "secret4", Bloodline.Vorlen);
+                Check(dorian2.WaitFor(() => dorian2.Welcomed && dorian2.Self != null && dorian2.Lineage != null, 5) &&
+                      dorian2.Self.Bloodline == Bloodline.Ashborn && dorian2.Lineage.Sire.Name == "Alaric", "Dorian is still Alaric's Ashborn childe after restart");
+                dorian2.Say("/lineage renounce");
+                Check(again.WaitFor(() => again.Lineage.Childer.Length == 0 && again.HasNotice("renounced you"), 3) &&
+                      dorian2.WaitFor(() => dorian2.Lineage.Sire.Name == "" && dorian2.Lineage.Status == LineageStatus.Unclaimed, 3),
+                      "Dorian renounces his sire");
+                dorian2.Conn.Close("done");
                 again.Conn.Close("done");
                 beatrix.Conn.Close("done");
                 corvin.Conn.Close("done");
