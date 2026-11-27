@@ -13,7 +13,12 @@ mechanic, feeding on humans and ghoul-style minion missions. The setting and rul
 
 ## Features
 
-- **Four bloodlines**, each with a gift: Vorlen *Surge*, Sylphine *Allure*, Ashborn *Blood Lash*, Aurum *Command*.
+- **Four bloodlines with three gifts each.** The first is innate; the other two are learned by spending standing, which also weights your Regent vote.
+  - **Vorlen:** Surge, Iron Skin, Earthshaker.
+  - **Sylphine:** Allure, Glamour, Rapture.
+  - **Ashborn:** Blood Lash, Siphon, Crimson Mist.
+  - **Aurum:** Command, Majesty, Dominate.
+  The full table is in [DESIGN.md](Docs/DESIGN.md#4-bloodlines-and-gifts).
 - **Feeding** on a living crowd of mortals in four districts, and the choice to release them in time or let them die.
 - **The Hush:** witnesses raise your Exposure. Hunters come at 50%, and at 80% any vampire may kill you.
 - **Conscience:** killing mortals lets the Beast take over.
@@ -107,13 +112,14 @@ The repository doesn't ship realistic human models yet. None of the CC0 sources 
 | Left click / Tab | Select a target / cycle through nearby targets |
 | F | Feed on the targeted (or nearest) mortal / release them |
 | 1 | Strike |
-| 2 | Use your bloodline gift |
+| 2 / 3 / 4 | Use your bloodline's three gifts |
+| G | Gifts panel (learn new gifts with standing) |
 | T | Thrall panel |
 | Enter | Chat (`/help` for commands) |
 | H / F1 | Help |
 | Esc | Clear target, close panels |
 
-Chat commands: `/help /who /stats /districts /say /c /city /circle … /vote /thrall /hunt /edict`.
+Chat commands: `/help /who /stats /districts /gifts /learn /say /c /city /circle … /vote /thrall /hunt /edict`.
 
 ## Dedicated server without Unity
 
@@ -141,10 +147,11 @@ Server options: `--port --seed --save --night --day --mortals --max-players --de
 - voting, dawn, the Regent and blood hunts;
 - PvP rules (circle immunity, Outlaw, torpor and respawn) and sanctums;
 - collision with buildings and hunters routing around them along the streets;
+- learning gifts with standing and the main gift effects (Siphon, Iron Skin, Dominate, Majesty, Crimson Mist);
 - persistence across a server restart.
 
 ```bash
-Server/build.sh && mono Server/bin/SanguineTests.exe     # 46 passed, 0 failed
+Server/build.sh && mono Server/bin/SanguineTests.exe     # 61 passed, 0 failed
 ```
 
 ## Project layout

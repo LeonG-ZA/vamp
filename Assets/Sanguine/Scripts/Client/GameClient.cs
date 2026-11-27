@@ -47,6 +47,7 @@ namespace Sanguine.Client
         public bool UiCapturesMouse;
         public bool ThrallPanelOpen;
         public bool HelpOpen;
+        public bool GiftsPanelOpen;
 
         public GameServer HostedServer { get; private set; }
 
@@ -304,10 +305,13 @@ namespace Sanguine.Client
 
             if (Input.GetMouseButtonDown(0) && !UiCapturesMouse) PickTarget();
             if (Input.GetKeyDown(KeyCode.Tab)) CycleTarget();
-            if (Input.GetKeyDown(KeyCode.Escape)) { TargetId = 0; ThrallPanelOpen = false; HelpOpen = false; }
+            if (Input.GetKeyDown(KeyCode.Escape)) { TargetId = 0; ThrallPanelOpen = false; HelpOpen = false; GiftsPanelOpen = false; }
             if (Input.GetKeyDown(KeyCode.F)) ToggleFeed();
             if (Input.GetKeyDown(KeyCode.Alpha1)) DoAttack();
-            if (Input.GetKeyDown(KeyCode.Alpha2)) DoPower();
+            if (Input.GetKeyDown(KeyCode.Alpha2)) UseGift(0);
+            if (Input.GetKeyDown(KeyCode.Alpha3)) UseGift(1);
+            if (Input.GetKeyDown(KeyCode.Alpha4)) UseGift(2);
+            if (Input.GetKeyDown(KeyCode.G)) GiftsPanelOpen = !GiftsPanelOpen;
             if (Input.GetKeyDown(KeyCode.T)) ThrallPanelOpen = !ThrallPanelOpen;
             if (Input.GetKeyDown(KeyCode.H) || Input.GetKeyDown(KeyCode.F1)) HelpOpen = !HelpOpen;
         }
@@ -334,12 +338,25 @@ namespace Sanguine.Client
             Send(SimpleMsg.Attack(t.Id));
         }
 
-        public void DoPower()
+        public bool KnowsGift(int slot)
         {
-            if (MyDef.PowerTarget == PowerTarget.Self) { Send(SimpleMsg.Power(0)); return; }
+            return Self != null && (Self.LearnedGifts & (1 << slot)) != 0;
+        }
+
+        /// <summary>Uses the gift in a slot (0-2): self/area gifts need no target.</summary>
+        public void UseGift(int slot)
+        {
+            GiftDef gift = MyDef.Gifts[slot];
+            if (!KnowsGift(slot))
+            {
+                LocalNotice(gift.Name + " is not learned yet (" + gift.StandingCost + " standing). Press G.");
+                GiftsPanelOpen = true;
+                return;
+            }
+            if (gift.Target == PowerTarget.Self) { Send(SimpleMsg.Power(slot, 0)); return; }
             EntityView t = Target;
-            if (t == null) { LocalNotice(MyDef.PowerName + " needs a target."); return; }
-            Send(SimpleMsg.Power(t.Id));
+            if (t == null) { LocalNotice(gift.Name + " needs a target."); return; }
+            Send(SimpleMsg.Power(slot, t.Id));
         }
 
         public void SendChat(ChatChannel ch, string text)

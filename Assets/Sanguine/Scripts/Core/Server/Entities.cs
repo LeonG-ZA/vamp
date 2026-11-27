@@ -73,7 +73,9 @@ namespace Sanguine.Server
         public float FeedStartX, FeedStartZ;
         public float FedThisFeeding;
 
-        public double AttackReadyAt, PowerReadyAt;
+        public double AttackReadyAt;
+        public readonly double[] GiftReadyAt = new double[GameRules.GiftSlots];
+        public double IronSkinUntil, GlamourUntil, MistUntil, MajestyUntil, SilencedUntil;
         public double SurgeUntil, SlowUntil, RootUntil;
         public double TorporUntil = -1;
         public double OutlawUntil, BloodHuntUntil;
@@ -99,6 +101,8 @@ namespace Sanguine.Server
         public float Conscience { get { return Profile.Conscience; } set { Profile.Conscience = value; } }
         public int Standing { get { return Profile.Standing; } set { Profile.Standing = value; } }
         public float MaxBlood { get { return Def.MaxBlood; } }
+
+        public bool HasGift(int slot) { return slot == 0 || (Profile.Gifts & (1 << slot)) != 0; }
     }
 
     /// <summary>A network connection, logged in or not.</summary>

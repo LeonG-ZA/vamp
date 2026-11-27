@@ -133,7 +133,7 @@ namespace Sanguine.Server
                         // Mortals sense the Beast in those who have lost their conscience.
                         foreach (var p in _players)
                         {
-                            if (!p.InTorpor && p.Conscience <= GameRules.ConscienceBeastThreshold && p.DistanceTo(m) < 8f)
+                            if (!p.InTorpor && p.Conscience <= GameRules.ConscienceBeastThreshold && _now >= p.GlamourUntil && p.DistanceTo(m) < 8f)
                             { Alarm(m, p.X, p.Z); break; }
                         }
                         if (m.Mode != MortalMode.Walking) break;
@@ -199,7 +199,7 @@ namespace Sanguine.Server
 
         private void MaybeSpawnHunters(PlayerEntity p)
         {
-            if (p.InTorpor || p.Exposure < GameRules.ExposureHunterThreshold) return;
+            if (p.InTorpor || p.Exposure < GameRules.ExposureHunterThreshold || _now < p.MistUntil) return;
             if (ZoneKindAt(p.X, p.Z) != ZoneKind.None) return;
             int desired = p.Exposure >= GameRules.ExposureMarkedThreshold ? 3 : 1;
             if (HuntersOn(p) >= desired) return;
@@ -258,6 +258,12 @@ namespace Sanguine.Server
                 if (h.IsStunned(_now)) continue;
 
                 float dist = h.DistanceTo(target);
+                if (_now < target.MajestyUntil && dist < 6.5f)
+                {
+                    // Awed by Majesty: the hunter keeps its distance and does not strike.
+                    h.Rot = Heading(target.X - h.X, target.Z - h.Z);
+                    continue;
+                }
                 if (dist > 1.6f)
                 {
                     // Chase directly when the target is in sight, otherwise follow the streets around buildings.

@@ -17,6 +17,7 @@ namespace Sanguine.Client
         private Vector3 _targetPos;
         private float _targetRot;
         private CharacterVisual _visual;
+        private GiftAura _aura;
         private GameObject _crown, _markLight, _bloodPool;
         private bool _hasPosition;
         private Vector3 _lastPos;
@@ -38,6 +39,7 @@ namespace Sanguine.Client
         {
             CharacterRole role = Kind == EntityKind.Player ? CharacterRole.Vampire : (Kind == EntityKind.Hunter ? CharacterRole.Hunter : CharacterRole.Mortal);
             _visual = CharacterVisual.Create(transform, role, Id, Info.Bloodline);
+            if (Kind == EntityKind.Player) _aura = GiftAura.Attach(gameObject, _visual.gameObject);
 
             if (Kind == EntityKind.Hunter && _visual.RightHand != null)
             {
@@ -127,6 +129,8 @@ namespace Sanguine.Client
             bool down = (Flags & EntityFlags.Down) != 0;
             bool feeding = (Flags & EntityFlags.Feeding) != 0 && Kind == EntityKind.Player;
             _visual.SetMotion(down ? 0f : _speed, feeding, down);
+            if (_aura != null)
+                _aura.Show((Flags & EntityFlags.Mist) != 0, (Flags & EntityFlags.Majesty) != 0, (Flags & EntityFlags.IronSkin) != 0);
 
             _bloodPool.SetActive(down && Kind != EntityKind.Player);
             if (_crown != null) _crown.SetActive((Flags & EntityFlags.Regent) != 0);

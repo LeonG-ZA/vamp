@@ -9,18 +9,42 @@ namespace Sanguine
 
     public enum PowerTarget : byte { Self = 0, Other = 1 }
 
+    /// <summary>Every bloodline gift. Three per bloodline: tier 1 is innate, tiers 2-3 are learned with standing.</summary>
+    public enum GiftId : byte
+    {
+        Surge = 0, IronSkin = 1, Earthshaker = 2,
+        Allure = 3, Glamour = 4, Rapture = 5,
+        BloodLash = 6, Siphon = 7, CrimsonMist = 8,
+        Command = 9, Majesty = 10, Dominate = 11,
+    }
+
+    public sealed class GiftDef
+    {
+        public GiftId Id;
+        public Bloodline Line;
+        public int Tier;                 // 1..3 (slot = Tier - 1)
+        public string Name;
+        public string Description;
+        public PowerTarget Target;
+        public float Cost;               // blood
+        public float Cooldown;           // seconds
+        public float Range;              // targeted range, or radius for area gifts
+        public float Duration;           // seconds, for lasting effects
+        /// <summary>Subtle gifts do not breach the Hush when mortals see them.</summary>
+        public bool Subtle;
+
+        public int Slot { get { return Tier - 1; } }
+        public int StandingCost { get { return GameRules.GiftStandingCost[Tier - 1]; } }
+    }
+
     public sealed class BloodlineDef
     {
         public Bloodline Id;
         public string Name;
         public string Epithet;
         public string Description;
-        public string PowerName;
-        public string PowerDescription;
-        public PowerTarget PowerTarget;
-        public float PowerCost;
-        public float PowerCooldown;
-        public float PowerRange;
+        /// <summary>The bloodline's three gifts, by slot (filled from <see cref="GameData.Gifts"/>).</summary>
+        public GiftDef[] Gifts = new GiftDef[GameRules.GiftSlots];
         public float MaxBlood;
         public float MaxHealth;
         public float MeleeDamage;
@@ -63,7 +87,7 @@ namespace Sanguine
 
     public static class GameRules
     {
-        public const int ProtocolVersion = 3;
+        public const int ProtocolVersion = 4;
         public const int DefaultPort = 7777;
 
         // Movement
@@ -98,6 +122,11 @@ namespace Sanguine
         public const float ExposureDecayPerSecond = 1.5f;
         public const float ConscienceBeastThreshold = 3f;
 
+        // Gifts
+        public const int GiftSlots = 3;
+        /// <summary>Standing spent to learn the gift in each slot (slot 0 is innate).</summary>
+        public static readonly int[] GiftStandingCost = { 0, 5, 12 };
+
         // Thralls
         public const int ThrallsPerPlayer = 2;
         public const float ThrallRecoverySeconds = 180f;
@@ -117,9 +146,6 @@ namespace Sanguine
             {
                 Id = Bloodline.Vorlen, Name = "Vorlen", Epithet = "the Iron Kin",
                 Description = "Dockside brawlers and street sovereigns. Hardy, direct, hard to put down.",
-                PowerName = "Surge",
-                PowerDescription = "Flood your limbs with blood: +60% speed and double melee damage for 6s.",
-                PowerTarget = PowerTarget.Self, PowerCost = 2f, PowerCooldown = 15f, PowerRange = 0f,
                 MaxBlood = 10f, MaxHealth = 13f, MeleeDamage = 2f, FavoredDistrict = 0,
                 R = 0.75f, G = 0.25f, B = 0.18f
             },
@@ -127,9 +153,6 @@ namespace Sanguine
             {
                 Id = Bloodline.Sylphine, Name = "Sylphine", Epithet = "the Velvet Choir",
                 Description = "Artists, muses and heartbreakers who feed on adoration as much as blood.",
-                PowerName = "Allure",
-                PowerDescription = "Mortals become entranced and follow you; rivals are slowed; hunters falter.",
-                PowerTarget = PowerTarget.Other, PowerCost = 1f, PowerCooldown = 10f, PowerRange = 12f,
                 MaxBlood = 11f, MaxHealth = 10f, MeleeDamage = 1f, FavoredDistrict = 1,
                 R = 0.85f, G = 0.35f, B = 0.65f
             },
@@ -137,9 +160,6 @@ namespace Sanguine
             {
                 Id = Bloodline.Ashborn, Name = "Ashborn", Epithet = "the Grave Choir",
                 Description = "Scholars of the occult who shape their own blood into weapons.",
-                PowerName = "Blood Lash",
-                PowerDescription = "Hurl a whip of vitae at a target up to 15m away for 3 damage.",
-                PowerTarget = PowerTarget.Other, PowerCost = 2f, PowerCooldown = 6f, PowerRange = 15f,
                 MaxBlood = 12f, MaxHealth = 9f, MeleeDamage = 1f, FavoredDistrict = 2,
                 R = 0.45f, G = 0.3f, B = 0.8f
             },
@@ -147,9 +167,6 @@ namespace Sanguine
             {
                 Id = Bloodline.Aurum, Name = "Aurum", Epithet = "the Gilded Court",
                 Description = "Old money and older blood. Their word is a chain upon lesser minds.",
-                PowerName = "Command",
-                PowerDescription = "A mortal forgets what it saw (-15 exposure); rivals are rooted, hunters stunned.",
-                PowerTarget = PowerTarget.Other, PowerCost = 2f, PowerCooldown = 12f, PowerRange = 9f,
                 MaxBlood = 10f, MaxHealth = 11f, MeleeDamage = 1f, FavoredDistrict = 3,
                 R = 0.9f, G = 0.75f, B = 0.3f
             },
@@ -186,6 +203,63 @@ namespace Sanguine
                 MortalTitles = new[] { "Banker", "Analyst", "Security Guard", "Janitor", "Lawyer" }
             },
         };
+
+        public static readonly GiftDef[] Gifts =
+        {
+            // Vorlen, the Iron Kin
+            new GiftDef { Id = GiftId.Surge, Line = Bloodline.Vorlen, Tier = 1, Name = "Surge", Target = PowerTarget.Self,
+                Cost = 2f, Cooldown = 15f, Duration = 6f,
+                Description = "Flood your limbs with blood: +60% speed and double melee damage for 6s." },
+            new GiftDef { Id = GiftId.IronSkin, Line = Bloodline.Vorlen, Tier = 2, Name = "Iron Skin", Target = PowerTarget.Self,
+                Cost = 2f, Cooldown = 25f, Duration = 8f,
+                Description = "Flesh hardens like cast iron for 8s: half damage, immune to roots, slows and stuns." },
+            new GiftDef { Id = GiftId.Earthshaker, Line = Bloodline.Vorlen, Tier = 3, Name = "Earthshaker", Target = PowerTarget.Self,
+                Cost = 3f, Cooldown = 30f, Range = 6f,
+                Description = "Slam the street: 3 damage and a 1.5s stun to rivals and hunters within 6m. Mortals flee." },
+
+            // Sylphine, the Velvet Choir
+            new GiftDef { Id = GiftId.Allure, Line = Bloodline.Sylphine, Tier = 1, Name = "Allure", Target = PowerTarget.Other,
+                Cost = 1f, Cooldown = 10f, Range = 12f,
+                Description = "Mortals become entranced and follow you; rivals are slowed; hunters falter." },
+            new GiftDef { Id = GiftId.Glamour, Line = Bloodline.Sylphine, Tier = 2, Name = "Glamour", Target = PowerTarget.Self,
+                Cost = 2f, Cooldown = 30f, Duration = 10f, Subtle = true,
+                Description = "For 10s every eye slides off you: no exposure from witnesses, and the Beast in you frightens no one." },
+            new GiftDef { Id = GiftId.Rapture, Line = Bloodline.Sylphine, Tier = 3, Name = "Rapture", Target = PowerTarget.Self,
+                Cost = 3f, Cooldown = 40f, Range = 15f,
+                Description = "Every mortal within 15m is enthralled, hunters falter for 3s and rivals within 10m are slowed." },
+
+            // Ashborn, the Grave Choir
+            new GiftDef { Id = GiftId.BloodLash, Line = Bloodline.Ashborn, Tier = 1, Name = "Blood Lash", Target = PowerTarget.Other,
+                Cost = 2f, Cooldown = 6f, Range = 15f,
+                Description = "Hurl a whip of vitae at a target up to 15m away for 3 damage." },
+            new GiftDef { Id = GiftId.Siphon, Line = Bloodline.Ashborn, Tier = 2, Name = "Siphon", Target = PowerTarget.Other,
+                Cost = 1f, Cooldown = 14f, Range = 10f,
+                Description = "Draw up to 2 blood out of a target 10m away and into your veins. Drained mortals die." },
+            new GiftDef { Id = GiftId.CrimsonMist, Line = Bloodline.Ashborn, Tier = 3, Name = "Crimson Mist", Target = PowerTarget.Self,
+                Cost = 3f, Cooldown = 45f, Duration = 4f,
+                Description = "Dissolve into red mist for 4s: untouchable and 30% faster; hunters lose your trail." },
+
+            // Aurum, the Gilded Court
+            new GiftDef { Id = GiftId.Command, Line = Bloodline.Aurum, Tier = 1, Name = "Command", Target = PowerTarget.Other,
+                Cost = 2f, Cooldown = 12f, Range = 9f, Subtle = true,
+                Description = "A mortal forgets what it saw (-15 exposure); rivals are rooted, hunters stunned." },
+            new GiftDef { Id = GiftId.Majesty, Line = Bloodline.Aurum, Tier = 2, Name = "Majesty", Target = PowerTarget.Self,
+                Cost = 2f, Cooldown = 30f, Duration = 8f, Range = 6f, Subtle = true,
+                Description = "For 8s rivals cannot bring themselves to strike you, and hunters keep 6m away." },
+            new GiftDef { Id = GiftId.Dominate, Line = Bloodline.Aurum, Tier = 3, Name = "Dominate", Target = PowerTarget.Other,
+                Cost = 3f, Cooldown = 40f, Range = 9f, Duration = 6f, Subtle = true,
+                Description = "A hunter abandons the hunt; a rival is rooted 3s and silenced 6s; a mortal makes every witness within 10m forget (-30 exposure)." },
+        };
+
+        static GameData()
+        {
+            foreach (GiftDef g in Gifts) Bloodlines[(int)g.Line].Gifts[g.Slot] = g;
+        }
+
+        public static GiftDef GetGift(GiftId id)
+        {
+            return Gifts[(int)id];
+        }
 
         public static BloodlineDef GetBloodline(Bloodline b)
         {

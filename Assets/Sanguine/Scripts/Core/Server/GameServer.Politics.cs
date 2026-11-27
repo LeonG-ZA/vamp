@@ -64,6 +64,8 @@ namespace Sanguine.Server
                 case "hunt": CmdHunt(p, arg1); break;
                 case "edict": CmdEdict(p, rest); break;
                 case "thrall": CmdThrall(p, arg1); break;
+                case "gifts": CmdGifts(p); break;
+                case "learn": CmdLearn(p, rest); break;
                 case "districts": CmdDistricts(p); break;
                 default:
                     if (_cfg.DebugCommands && HandleDebugCommand(p, cmd, parts)) break;
@@ -79,6 +81,7 @@ namespace Sanguine.Server
             SystemMsg(p, "Politics: /vote <player> (Regent chosen at dawn, votes weighted by standing)");
             SystemMsg(p, "Regent only: /hunt <player> (declare a blood hunt)  /edict <text>");
             SystemMsg(p, "Thralls: /thrall <1-4|district> sends a ghoul servant to sway a district.");
+            SystemMsg(p, "Gifts: /gifts lists your bloodline's gifts; /learn <2|3|name> spends standing to learn one.");
         }
 
         private void CmdWho(PlayerEntity p)
@@ -101,6 +104,44 @@ namespace Sanguine.Server
             SystemMsg(p, string.Format(CultureInfo.InvariantCulture,
                 "{0} of the {1}: standing {2}, conscience {3:0.0}, feedings {4}, mortal deaths {5}, thrall missions {6}.",
                 pr.Name, p.Def.Name, pr.Standing, pr.Conscience, pr.Feedings, pr.Kills, pr.Missions));
+        }
+
+        // ------------------------------------------------------------------
+        // Gifts
+        // ------------------------------------------------------------------
+
+        private void CmdGifts(PlayerEntity p)
+        {
+            SystemMsg(p, "Gifts of the " + p.Def.Name + " (standing " + p.Standing + "):");
+            foreach (GiftDef g in p.Def.Gifts)
+            {
+                string state = p.HasGift(g.Slot) ? "known" : "learn for " + g.StandingCost + " standing";
+                SystemMsg(p, string.Format(CultureInfo.InvariantCulture, "{0}. {1} [{2}] - {3} ({4} blood, {5}s)",
+                    g.Tier, g.Name, state, g.Description, g.Cost, g.Cooldown));
+            }
+        }
+
+        private void CmdLearn(PlayerEntity p, string arg)
+        {
+            GiftDef gift = null;
+            int n;
+            if (int.TryParse(arg, out n) && n >= 1 && n <= GameRules.GiftSlots) gift = p.Def.Gifts[n - 1];
+            else
+                foreach (GiftDef g in p.Def.Gifts)
+                    if (arg.Length > 0 && g.Name.ToLowerInvariant().StartsWith(arg.ToLowerInvariant())) gift = g;
+            if (gift == null) { SystemMsg(p, "Usage: /learn <2|3|gift name>. See /gifts."); return; }
+            if (p.HasGift(gift.Slot)) { SystemMsg(p, "You already know " + gift.Name + "."); return; }
+            if (gift.Slot > 1 && !p.HasGift(gift.Slot - 1)) { SystemMsg(p, "Learn " + p.Def.Gifts[gift.Slot - 1].Name + " first."); return; }
+            if (p.Standing < gift.StandingCost)
+            {
+                SystemMsg(p, gift.Name + " costs " + gift.StandingCost + " standing; you have " + p.Standing + ".");
+                return;
+            }
+            p.Standing -= gift.StandingCost;
+            p.Profile.Gifts |= 1 << gift.Slot;
+            _store.SaveProfile(p.Profile);
+            Notice(p, NoticeLevel.Good, "Your elders teach you " + gift.Name + ". (-" + gift.StandingCost + " standing)");
+            SystemMsg(p, gift.Name + ": " + gift.Description + " Use it with key " + (gift.Slot + 2) + ".");
         }
 
         private void CmdDistricts(PlayerEntity p)
@@ -427,6 +468,9 @@ namespace Sanguine.Server
                 case "setexposure":
                     p.Exposure = parts.Length > 1 ? Store.ParseFloat(parts[1]) : 0;
                     p.LastExposureGain = _now;
+                    return true;
+                case "setstanding":
+                    p.Standing = parts.Length > 1 ? Store.ParseInt(parts[1]) : 0;
                     return true;
                 case "setblood":
                     p.Blood = Math.Min(p.MaxBlood, parts.Length > 1 ? Store.ParseFloat(parts[1]) : p.MaxBlood);

@@ -116,6 +116,8 @@ def reverb(x, seconds=2.5, mix=0.3, r=None, damp=6000, circular=False, predelay=
     ir = r.standard_normal(n_ir) * np.exp(-t * 6.9 / seconds)
     ir = band(ir, 120, damp)
     ir[: int(predelay * SR)] = 0
+    tail = int(n_ir * 0.1)
+    ir[-tail:] *= np.linspace(1, 0, tail) ** 2  # taper: no edge (tick) at the end of the tail
     ir /= np.sqrt(np.sum(ir ** 2)) + 1e-12
     if x.ndim == 1:
         x = x[:, None]
@@ -174,7 +176,9 @@ def save(name, x, quality=5):
             w.setframerate(SR)
             w.writeframes(pcm.tobytes())
         dst = os.path.join(OUT, name + '.ogg')
-        subprocess.check_call(['ffmpeg', '-y', '-loglevel', 'error', '-i', wav, '-c:a', 'libvorbis', '-q:a', str(quality), dst])
+        # bitexact: fixed Ogg serial numbers, so unchanged sounds produce identical files on every run.
+        subprocess.check_call(['ffmpeg', '-y', '-loglevel', 'error', '-i', wav, '-c:a', 'libvorbis', '-q:a', str(quality),
+                               '-fflags', '+bitexact', '-flags:a', '+bitexact', dst])
     print(f'  {name:22s} {len(x) / SR:5.2f}s {"stereo" if ch == 2 else "mono  "} {os.path.getsize(dst) / 1024:7.1f} KB')
 
 
@@ -456,6 +460,118 @@ def power_command():
     return fade(normalize(reverb(voice + boom, 3.0, 0.4), -2.0))
 
 
+def power_iron_skin():
+    r = rng(340)
+    tt = t_axis(2.0)
+    f0 = 330.0
+    x = sum(a * np.sin(TAU * f0 * k * tt + r.uniform(0, TAU)) * np.exp(-tt / d)
+            for k, a, d in [(1, 1, 1.2), (2.32, 0.7, 0.8), (4.25, 0.45, 0.5), (6.63, 0.3, 0.3), (9.1, 0.15, 0.15)])
+    x *= np.minimum(1, tt / 0.001) * 0.4
+    x += band(r.standard_normal(len(tt)), 2000, 10000) * np.exp(-tt / 0.01) * 0.5
+    x += np.sin(TAU * 70 * tt) * np.exp(-tt / 0.08) * 0.5
+    return fade(normalize(reverb(x, 1.2, 0.25), -2.0))
+
+
+def power_earthshaker():
+    r = rng(341)
+    dur = 3.0
+    tt = t_axis(dur)
+    n = len(tt)
+    x = sine_sweep(dur, 62, 24) * np.exp(-tt / 0.7) * 1.0
+    x += band(r.standard_normal(n), 30, 220) * np.exp(-tt / 0.9) * 0.6
+    imp = np.zeros(n)
+    idx = r.integers(int(0.05 * SR), int(1.6 * SR), 120)
+    imp[idx] = r.uniform(0.1, 1.0, len(idx)) ** 2 * np.exp(-idx / SR / 0.6)
+    kt = t_axis(0.01)
+    debris = np.fft.irfft(np.fft.rfft(imp) * np.fft.rfft(r.standard_normal(len(kt)) * np.exp(-kt / 0.002), n), n)
+    x += band(debris, 800, 7000) * 1.2
+    return fade(normalize(reverb(x, 2.0, 0.3), -1.0))
+
+
+def power_glamour():
+    r = rng(342)
+    dur = 1.8
+    n = int(dur * SR)
+    x = np.zeros(n)
+    for i in range(42):
+        t0 = r.uniform(0, 1.2)
+        f = r.uniform(2600, 6500) * (1 - 0.35 * t0 / 1.2)
+        tt = t_axis(0.25)
+        add_at(x, np.sin(TAU * f * tt) * np.exp(-tt / 0.05) * r.uniform(0.05, 0.15), int(t0 * SR))
+    tt = t_axis(dur)
+    x += band(r.standard_normal(n), 4000, 12000) * np.sin(np.pi * np.minimum(tt / 1.4, 1)) ** 2 * 0.06
+    return fade(normalize(reverb(x, 2.0, 0.4), -4.0))
+
+
+def power_rapture():
+    r = rng(343)
+    dur = 3.2
+    tt = t_axis(dur)
+    hz = lambda m: 440.0 * 2 ** ((m - 69) / 12)
+    voices = np.zeros(len(tt))
+    for m in [57, 61, 64, 69, 73]:  # A major, spread
+        for det in (-0.004, 0.0, 0.004):
+            f = hz(m) * (1 + det)
+            voices += sum(np.sin(TAU * f * h * tt + r.uniform(0, TAU)) / h for h in range(1, 12)) * 0.05
+    choir = band(voices, 650, 950, 1.5) + 0.7 * band(voices, 1050, 1350, 1.5) + 0.25 * band(voices, 2500, 2900, 1.5)
+    env = np.minimum(1, tt / 0.6) * np.exp(-np.maximum(tt - 0.6, 0) / 1.1)
+    return fade(normalize(reverb(choir * env * (1 + 0.05 * np.sin(TAU * 5 * tt)), 3.0, 0.45), -3.0))
+
+
+def power_siphon():
+    r = rng(344)
+    dur = 1.1
+    tt = t_axis(dur)
+    n = len(tt)
+    x = np.zeros(n)
+    for i, (lo, hi) in enumerate([(250, 600), (500, 1100), (900, 1900), (1500, 3000)]):
+        x += band(r.standard_normal(n), lo, hi) * np.exp(-((tt - (0.12 + 0.13 * i)) / 0.09) ** 2) * (1 + 0.5 * np.sin(TAU * 31 * tt)) * 0.4
+    gulp = sine_sweep(0.2, 260, 110) * np.sin(np.pi * t_axis(0.2) / 0.2) ** 2 * 0.45
+    add_at(x, gulp, int(0.72 * SR))
+    return fade(normalize(reverb(x, 0.6, 0.2), -2.0))
+
+
+def power_crimson_mist():
+    r = rng(345)
+    dur = 1.6
+    tt = t_axis(dur)
+    n = len(tt)
+    x = np.zeros(n)
+    for i, (lo, hi) in enumerate([(5000, 10000), (2500, 6000), (1200, 3200), (500, 1500)]):  # descending hiss
+        x += band(r.standard_normal(n), lo, hi) * np.exp(-((tt - (0.2 + 0.18 * i)) / 0.22) ** 2) * 0.35
+    x += band(r.standard_normal(n), 40, 200) * np.sin(np.pi * tt / dur) * 0.3
+    return fade(normalize(reverb(x, 1.8, 0.35), -3.0))
+
+
+def power_majesty():
+    r = rng(346)
+    dur = 2.6
+    tt = t_axis(dur)
+    hz = lambda m: 440.0 * 2 ** ((m - 69) / 12)
+    x = np.zeros(len(tt))
+    env = np.minimum(1, tt / 0.18) * np.exp(-np.maximum(tt - 0.5, 0) / 0.9)
+    bright = np.minimum(1, tt / 0.3)
+    for m in [50, 57, 62, 69]:  # D and A: open, regal fifths
+        f = hz(m)
+        x += sum(np.sin(TAU * f * h * tt + r.uniform(0, TAU)) / h * (bright ** (h * 0.5)) for h in range(1, 14)) * 0.12
+    x = band(x * env, 80, 3500)
+    return fade(normalize(reverb(x, 2.8, 0.4), -2.0))
+
+
+def power_dominate():
+    r = rng(347)
+    dur = 2.4
+    tt = t_axis(dur)
+    saw = sum(np.sin(TAU * 41 * h * tt) / h for h in range(1, 40))
+    voice = band(saw, 250, 420, 2.5) + 0.6 * band(saw, 600, 850, 2.5) + 0.25 * band(saw, 2200, 2600, 2.5)
+    voice *= np.minimum(1, tt / 0.25) * np.exp(-np.maximum(tt - 0.4, 0) / 0.9) * 0.8
+    swell = band(r.standard_normal(len(tt)), 200, 2000) * (tt / dur) ** 3 * np.exp(-np.maximum(tt - 0.35, 0) / 0.05) * (tt < 0.45) * 0.4
+    x = voice + swell
+    bt = t_axis(dur - 0.4)
+    add_at(x, sine_sweep(dur - 0.4, 50, 22) * np.exp(-bt / 0.5) * np.minimum(1, bt / 0.004) * 0.9, int(0.4 * SR))
+    return fade(normalize(reverb(x, 3.0, 0.4), -2.0))
+
+
 def torpor():
     r = rng(320)
     dur = 3.0
@@ -528,6 +644,14 @@ def main():
     save('power_allure', power_allure())
     save('power_lash', power_lash())
     save('power_command', power_command())
+    save('power_iron_skin', power_iron_skin())
+    save('power_earthshaker', power_earthshaker())
+    save('power_glamour', power_glamour())
+    save('power_rapture', power_rapture())
+    save('power_siphon', power_siphon())
+    save('power_crimson_mist', power_crimson_mist())
+    save('power_majesty', power_majesty())
+    save('power_dominate', power_dominate())
     save('sfx_torpor', torpor())
     save('sting_danger', sting_danger())
     save('sting_good', chime())

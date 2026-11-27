@@ -72,6 +72,7 @@ namespace Sanguine.Client
             DrawChat(h);
             if (Client.ThrallPanelOpen) DrawThralls(w, h);
             if (Client.HelpOpen) DrawHelp(w, h);
+            if (Client.GiftsPanelOpen) DrawGifts(w, h);
 
             // Track whether the mouse is over UI so clicks don't pick targets or orbit the camera.
             // (Event.current.mousePosition is affected by GUI.matrix, so use raw screen coordinates.)
@@ -145,8 +146,12 @@ namespace Sanguine.Client
             GUILayout.EndHorizontal();
             BloodlineDef sel = GameData.GetBloodline(Client.ChosenBloodline);
             GUILayout.Label(sel.Description, _label);
-            GUILayout.Label("<b>Gift: " + sel.PowerName + "</b> - " + sel.PowerDescription +
-                            "\nBlood " + sel.MaxBlood + "  Health " + sel.MaxHealth + "  Melee " + sel.MeleeDamage +
+            var gifts = new StringBuilder();
+            foreach (GiftDef g in sel.Gifts)
+                gifts.Append("<b>").Append(g.Name).Append("</b>")
+                     .Append(g.Tier == 1 ? " (innate)" : " (" + g.StandingCost + " standing)").Append(" - ").Append(g.Description).Append('\n');
+            GUILayout.Label(gifts.ToString().TrimEnd('\n'), _small);
+            GUILayout.Label("Blood " + sel.MaxBlood + "  Health " + sel.MaxHealth + "  Melee " + sel.MeleeDamage +
                             "  Favoured district: " + GameData.Districts[sel.FavoredDistrict].Name, _small);
 
             GUILayout.Space(6);
@@ -273,6 +278,11 @@ namespace Sanguine.Client
             AddFlag(flags, s.Flags, SelfFlags.Rooted, "Rooted", "c0c0ff");
             AddFlag(flags, s.Flags, SelfFlags.InHaven, "Haven (safe)", "80ff80");
             AddFlag(flags, s.Flags, SelfFlags.InSanctum, "Sanctum (no violence)", "fff0a0");
+            AddFlag(flags, s.Flags, SelfFlags.IronSkin, "Iron Skin", "c0d0e0");
+            AddFlag(flags, s.Flags, SelfFlags.Glamour, "Glamour", "ffb0f0");
+            AddFlag(flags, s.Flags, SelfFlags.Mist, "Crimson Mist", "ff5050");
+            AddFlag(flags, s.Flags, SelfFlags.Majesty, "Majesty", "ffd860");
+            AddFlag(flags, s.Flags, SelfFlags.Silenced, "SILENCED", "a0a0ff");
             GUI.Label(new Rect(panel.x + 8, y + 108, 274, 60), flags.ToString(), _small);
         }
 
@@ -367,8 +377,8 @@ namespace Sanguine.Client
             SelfStateMsg s = Client.Self;
             if (s == null) return;
             BloodlineDef def = Client.MyDef;
-            float bw = 120, bh = 48, gap = 6;
-            float total = bw * 5 + gap * 4;
+            float bw = 112, bh = 48, gap = 6;
+            float total = bw * 8 + gap * 7;
             float x = w / 2 - total / 2, y = h - bh - 10;
             Capture(Scale(new Rect(x, y, total, bh)));
 
@@ -377,7 +387,16 @@ namespace Sanguine.Client
             x += bw + gap;
             if (ActionButton(new Rect(x, y, bw, bh), "[1] Strike", s.AttackCooldown)) Client.DoAttack();
             x += bw + gap;
-            if (ActionButton(new Rect(x, y, bw, bh), "[2] " + def.PowerName + "\n<size=10>" + def.PowerCost + " blood</size>", s.PowerCooldown)) Client.DoPower();
+            for (int slot = 0; slot < GameRules.GiftSlots; slot++)
+            {
+                GiftDef g = def.Gifts[slot];
+                bool known = Client.KnowsGift(slot);
+                string label = "[" + (slot + 2) + "] " + g.Name + "\n<size=10>" +
+                               (known ? g.Cost + " blood" : "<color=#ff9060>locked: " + g.StandingCost + " standing</color>") + "</size>";
+                if (ActionButton(new Rect(x, y, bw, bh), label, known ? s.GiftCooldowns[slot] : 0f)) Client.UseGift(slot);
+                x += bw + gap;
+            }
+            if (ActionButton(new Rect(x, y, bw, bh), "[G] Gifts", 0)) Client.GiftsPanelOpen = !Client.GiftsPanelOpen;
             x += bw + gap;
             if (ActionButton(new Rect(x, y, bw, bh), "[T] Thralls", 0)) Client.ThrallPanelOpen = !Client.ThrallPanelOpen;
             x += bw + gap;
@@ -507,6 +526,39 @@ namespace Sanguine.Client
             GUILayout.EndArea();
         }
 
+        private void DrawGifts(float w, float h)
+        {
+            SelfStateMsg s = Client.Self;
+            if (s == null) return;
+            BloodlineDef def = Client.MyDef;
+            Rect r = new Rect(w / 2 - 300, h - 430, 600, 340);
+            Capture(Scale(r));
+            GUILayout.BeginArea(r, _box);
+            GUILayout.Label("<b>Gifts of the " + def.Name + "</b> - learning a gift spends standing (which also weighs your vote). Standing: <b>" + s.Standing + "</b>", _label);
+            foreach (GiftDef g in def.Gifts)
+            {
+                bool known = Client.KnowsGift(g.Slot);
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("<b>[" + (g.Slot + 2) + "] " + g.Name + "</b>  <size=11>" + g.Cost + " blood, " + g.Cooldown + "s" +
+                                (g.Target == PowerTarget.Other ? ", " + g.Range + "m, needs a target" : "") + (g.Subtle ? ", subtle" : "") +
+                                "</size>\n<size=12>" + g.Description + "</size>", _label, GUILayout.Width(450));
+                bool canLearn = !known && s.Standing >= g.StandingCost && (g.Slot == 0 || Client.KnowsGift(g.Slot - 1));
+                GUI.enabled = canLearn;
+                string btn = known ? "Known" : "Learn\n<size=10>" + g.StandingCost + " standing</size>";
+                if (GUILayout.Button(btn, new GUIStyle(GUI.skin.button) { richText = true }, GUILayout.Height(44)))
+                {
+                    UiClick();
+                    Client.SendChat(ChatChannel.Local, "/learn " + (g.Slot + 1));
+                }
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+                GUILayout.Space(4);
+            }
+            GUILayout.Label("<size=11>Subtle gifts do not breach the Hush. Earn standing with thrall missions, justice and district control.</size>", _small);
+            if (GUILayout.Button("Close")) Client.GiftsPanelOpen = false;
+            GUILayout.EndArea();
+        }
+
         private void DrawHelp(float w, float h)
         {
             Rect r = new Rect(w / 2 - 300, 120, 600, Mathf.Min(560, h - 200));
@@ -515,7 +567,8 @@ namespace Sanguine.Client
             GUILayout.Label("<b>How to survive the night</b>", _label);
             GUILayout.Label(
                 "<b>Controls</b>: WASD move, right-drag or Q/E turn the camera, mouse wheel zoom. Click or Tab to target. " +
-                "F feed / release, 1 strike, 2 use your gift, T thralls, Enter chat, Esc clear target.\n\n" +
+                "F feed / release, 1 strike, 2-4 your three gifts, G learn gifts, T thralls, Enter chat, Esc clear target.\n\n" +
+                "<b>Gifts</b>: every bloodline has three. The first is innate; the others are learned by spending standing.\n\n" +
                 "<b>Blood</b> drains over time and fuels your gift and healing. Feed on mortals, but release them (F) before " +
                 "their heart stops: killing lowers your <b>Conscience</b>. At 3 or less the Beast rules you and you are Marked.\n\n" +
                 "<b>The Hush</b>: feeding, violence and powers seen by mortals raise <b>Exposure</b>. At 50% hunters come for you; " +

@@ -211,7 +211,7 @@ namespace Sanguine.Tests
                 beatrix.Conn.Send(SimpleMsg.Attack(alaric.Id));
                 Check(beatrix.WaitFor(() => beatrix.HasNotice("of your circle"), 3), "circle members cannot harm each other");
 
-                corvin.Conn.Send(SimpleMsg.Power(0)); // Surge
+                corvin.Conn.Send(SimpleMsg.Power(0, 0)); // Surge
                 Check(corvin.WaitFor(() => corvin.Flag(SelfFlags.Surge), 2), "Corvin activates Surge");
                 for (int i = 0; i < 12 && !alaric.Flag(SelfFlags.Torpor); i++)
                 {
@@ -284,6 +284,67 @@ namespace Sanguine.Tests
                 Check(spawned && lastDist < firstDist - 5f, "the hunter closes in along the streets (" + firstDist.ToString("0") + " m -> " + lastDist.ToString("0") + " m)");
                 alaric.Say("/setexposure 0");
 
+                // --- Gifts -----------------------------------------------------------
+                Console.WriteLine("[gifts]");
+                alaric.Chat.Clear();
+                alaric.Say("/learn 2");
+                Check(alaric.WaitFor(() => alaric.HasChat("costs 5 standing"), 3), "learning a gift needs standing");
+                alaric.Say("/setstanding 20");
+                Thread.Sleep(300);
+                alaric.Say("/learn 2");
+                Check(alaric.WaitFor(() => alaric.HasNotice("teach you Siphon"), 3), "Alaric learns Siphon for 5 standing");
+                Thread.Sleep(1100);
+                alaric.Say("/learn crimson");
+                Check(alaric.WaitFor(() => alaric.Self.LearnedGifts == 7 && alaric.Self.Standing == 3, 3),
+                      "Alaric learns Crimson Mist; standing spent (" + alaric.Self.Standing + " left)");
+
+                alaric.Say("/tp -100 4"); beatrix.Say("/tp -101 4"); corvin.Say("/tp -99 4");
+                Thread.Sleep(1100);
+                alaric.Say("/setblood 2"); corvin.Say("/setblood 6");
+                Thread.Sleep(1100);
+                alaric.Conn.Send(SimpleMsg.Power(1, corvin.Id));
+                Check(alaric.WaitFor(() => alaric.Self.Blood >= 2.9f, 2) && corvin.WaitFor(() => corvin.Self.Blood <= 4.1f, 2),
+                      "Siphon (1 blood) draws 2 blood from Corvin into Alaric");
+
+                corvin.Say("/setstanding 10");
+                Thread.Sleep(1100);
+                corvin.Say("/learn 2");
+                corvin.WaitFor(() => (corvin.Self.LearnedGifts & 2) != 0, 3);
+                corvin.Conn.Send(SimpleMsg.Power(1, 0));
+                Check(corvin.WaitFor(() => corvin.Flag(SelfFlags.IronSkin), 2), "Corvin hardens with Iron Skin");
+                float before = corvin.Self.Health;
+                beatrix.Conn.Send(SimpleMsg.Attack(corvin.Id));
+                Check(corvin.WaitFor(() => corvin.Self.Health < before - 0.01f, 2) && Math.Abs(before - corvin.Self.Health - 0.5f) < 0.05f,
+                      "Iron Skin halves damage (" + before.ToString("0.0") + " -> " + corvin.Self.Health.ToString("0.0") + ")");
+
+                beatrix.Say("/setstanding 30");
+                Thread.Sleep(1100);
+                beatrix.Say("/learn 2");
+                Thread.Sleep(1100);
+                beatrix.Say("/learn 3");
+                Check(beatrix.WaitFor(() => beatrix.Self.LearnedGifts == 7, 3), "Beatrix learns Majesty and Dominate");
+                beatrix.Conn.Send(SimpleMsg.Power(2, corvin.Id));
+                Check(corvin.WaitFor(() => corvin.Flag(SelfFlags.Silenced), 2) && !corvin.Flag(SelfFlags.Rooted),
+                      "Dominate silences Corvin; Iron Skin shrugs off the root");
+                corvin.Conn.Send(SimpleMsg.Power(0, 0));
+                Check(corvin.WaitFor(() => corvin.HasNotice("silenced"), 2), "a silenced vampire cannot use gifts");
+
+                beatrix.Conn.Send(SimpleMsg.Power(1, 0));
+                Check(beatrix.WaitFor(() => beatrix.Flag(SelfFlags.Majesty), 2), "Beatrix radiates Majesty");
+                Thread.Sleep(1100);
+                corvin.Conn.Send(SimpleMsg.Attack(beatrix.Id));
+                Check(corvin.WaitFor(() => corvin.HasNotice("cannot bring yourself"), 2), "Majesty stops a rival's attack");
+
+                alaric.Say("/setblood 6");
+                Thread.Sleep(400);
+                alaric.Conn.Send(SimpleMsg.Power(2, 0));
+                Check(alaric.WaitFor(() => alaric.Flag(SelfFlags.Mist), 2), "Alaric dissolves into Crimson Mist");
+                Check(corvin.WaitFor(() => corvin.Entities.Exists(e => e.Id == alaric.Id && (e.Flags & EntityFlags.Mist) != 0), 2),
+                      "other players see the mist");
+                Thread.Sleep(1100);
+                corvin.Conn.Send(SimpleMsg.Attack(alaric.Id));
+                Check(corvin.WaitFor(() => corvin.HasNotice("passes through crimson mist"), 2), "mist cannot be struck");
+
                 // --- Persistence -----------------------------------------------------
                 Console.WriteLine("[persistence]");
                 int standing = alaric.Self.Standing;
@@ -303,6 +364,7 @@ namespace Sanguine.Tests
                 Check(again.Self.Standing == standing, "standing persisted (" + again.Self.Standing + ")");
                 Check(again.World.MyCircle == "Nightjar Court", "circle membership persisted");
                 Check(again.World.Regent == "Alaric", "Regent persisted");
+                Check(again.Self.LearnedGifts == 7, "learned gifts persisted");
                 Check(again.WaitFor(() => again.Entities.Exists(e => e.Kind == EntityKind.Mortal), 3), "mortals repopulate after restart");
                 again.Conn.Close("done");
                 beatrix.Conn.Close("done");

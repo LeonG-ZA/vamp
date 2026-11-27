@@ -11,6 +11,7 @@ namespace Sanguine.Client
 
         private CharacterController _cc;
         private CharacterVisual _visual;
+        private GiftAura _aura;
         private float _yaw, _pitch = 18f, _distance = 7f;
         private float _verticalVelocity;
         private float _nextSend;
@@ -31,6 +32,7 @@ namespace Sanguine.Client
             lp._cc.stepOffset = 0.4f;
 
             lp._visual = CharacterVisual.Create(go.transform, CharacterRole.Vampire, client.MyId, bloodline);
+            lp._aura = GiftAura.Attach(go, lp._visual.gameObject);
 
             Camera cam = Camera.main;
             if (cam == null)
@@ -86,6 +88,7 @@ namespace Sanguine.Client
             float speed = GameRules.WalkSpeed;
             if ((f & SelfFlags.Surge) != 0) speed *= GameRules.SurgeSpeedMultiplier;
             if ((f & SelfFlags.Slowed) != 0) speed *= GameRules.SlowSpeedMultiplier;
+            if ((f & SelfFlags.Mist) != 0) speed *= 1.3f;
             if ((f & SelfFlags.Feeding) != 0) speed = 0f; // moving would break the embrace; press F to release first
             if (frozen) speed = 0f;
 
@@ -105,6 +108,7 @@ namespace Sanguine.Client
             Vector3 v = _cc.velocity;
             v.y = 0f;
             _visual.SetMotion(v.magnitude, (f & SelfFlags.Feeding) != 0, (f & SelfFlags.Torpor) != 0);
+            _aura.Show((f & SelfFlags.Mist) != 0, (f & SelfFlags.Majesty) != 0, (f & SelfFlags.IronSkin) != 0);
 
             // --- Network ------------------------------------------------------
             if (Time.time >= _nextSend)

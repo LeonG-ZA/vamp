@@ -39,7 +39,8 @@ namespace Sanguine.Client
 
         private float _day, _indoors, _feedTime;
         private SelfFlags _prevFlags;
-        private float _prevAttackCd, _prevPowerCd;
+        private float _prevAttackCd;
+        private readonly float[] _prevGiftCd = new float[GameRules.GiftSlots];
         private bool _prevIsDay, _haveWorld, _haveSelf;
         private float _lastSting;
 
@@ -224,11 +225,12 @@ namespace Sanguine.Client
                 if ((s.Flags & SelfFlags.Marked) != 0 && (_prevFlags & SelfFlags.Marked) == 0) { Play("sting_danger", 0.7f); _lastSting = Time.time; }
                 // A cooldown that jumps from zero means the server accepted the action.
                 if (s.AttackCooldown > _prevAttackCd + 0.3f) Play("sfx_strike", 0.8f, null, Random.Range(0.92f, 1.08f));
-                if (s.PowerCooldown > _prevPowerCd + 0.5f) Play(PowerClip(Client.MyBloodline), 0.85f);
+                for (int i = 0; i < GameRules.GiftSlots; i++)
+                    if (s.GiftCooldowns[i] > _prevGiftCd[i] + 0.5f) Play(GiftClip(Client.MyDef.Gifts[i].Id), 0.85f);
             }
             _prevFlags = s.Flags;
             _prevAttackCd = s.AttackCooldown;
-            _prevPowerCd = s.PowerCooldown;
+            for (int i = 0; i < GameRules.GiftSlots; i++) _prevGiftCd[i] = s.GiftCooldowns[i];
             _haveSelf = true;
 
             // Heartbeat: the victim's while feeding (quickening), the vampire's own when starving.
@@ -240,14 +242,23 @@ namespace Sanguine.Client
             _sizzle.volume = Mathf.MoveTowards(_sizzle.volume, (s.Flags & SelfFlags.Sunlight) != 0 ? 0.6f : 0f, dt * 3f);
         }
 
-        private static string PowerClip(Bloodline b)
+        /// <summary>Clip for a gift: power_surge, power_iron_skin, power_crimson_mist, ...</summary>
+        public static string GiftClip(GiftId id)
         {
-            switch (b)
+            switch (id)
             {
-                case Bloodline.Vorlen: return "power_surge";
-                case Bloodline.Sylphine: return "power_allure";
-                case Bloodline.Ashborn: return "power_lash";
-                default: return "power_command";
+                case GiftId.Surge: return "power_surge";
+                case GiftId.IronSkin: return "power_iron_skin";
+                case GiftId.Earthshaker: return "power_earthshaker";
+                case GiftId.Allure: return "power_allure";
+                case GiftId.Glamour: return "power_glamour";
+                case GiftId.Rapture: return "power_rapture";
+                case GiftId.BloodLash: return "power_lash";
+                case GiftId.Siphon: return "power_siphon";
+                case GiftId.CrimsonMist: return "power_crimson_mist";
+                case GiftId.Command: return "power_command";
+                case GiftId.Majesty: return "power_majesty";
+                default: return "power_dominate";
             }
         }
 

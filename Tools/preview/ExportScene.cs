@@ -83,7 +83,7 @@ public static class ExportScene
         SelfStateMsg s = sel.Self;
         sb.Append("\"self\":{\"blood\":" + F(s.Blood) + ",\"maxBlood\":" + F(s.MaxBlood) + ",\"health\":" + F(s.Health) + ",\"maxHealth\":" + F(s.MaxHealth) +
                   ",\"conscience\":" + F(s.Conscience) + ",\"exposure\":" + F(s.Exposure) + ",\"standing\":" + s.Standing + ",\"flags\":" + (int)s.Flags +
-                  ",\"power\":" + F(s.PowerCooldown) + ",\"attack\":" + F(s.AttackCooldown) + ",\"district\":" + s.District + "},\n");
+                  ",\"gifts\":" + s.LearnedGifts + ",\"attack\":" + F(s.AttackCooldown) + ",\"district\":" + s.District + "},\n");
         WorldStateMsg w = sel.World;
         sb.Append("\"world\":{\"isDay\":" + (w.IsDay ? "true" : "false") + ",\"toChange\":" + F(w.SecondsToChange) + ",\"night\":" + w.Night + ",\"phase\":" + F(w.CyclePhase) +
                   ",\"regent\":" + S(w.Regent) + ",\"edict\":" + S(w.Edict) + ",\"circle\":" + S(w.MyCircle) + ",\"controllers\":[" +

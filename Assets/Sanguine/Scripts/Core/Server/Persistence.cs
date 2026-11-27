@@ -21,6 +21,8 @@ namespace Sanguine.Server
         public float X, Z;
         public string Circle = "";
         public int Kills, Feedings, Missions;
+        /// <summary>Bit mask of learned gift slots; slot 0 (bit 0) is innate.</summary>
+        public int Gifts = 1;
 
         public string Key { get { return Store.KeyOf(Name); } }
 
@@ -63,6 +65,7 @@ namespace Sanguine.Server
             Kv(sb, "kills", Kills.ToString(CultureInfo.InvariantCulture));
             Kv(sb, "feedings", Feedings.ToString(CultureInfo.InvariantCulture));
             Kv(sb, "missions", Missions.ToString(CultureInfo.InvariantCulture));
+            Kv(sb, "gifts", Gifts.ToString(CultureInfo.InvariantCulture));
             return sb.ToString();
         }
 
@@ -84,6 +87,7 @@ namespace Sanguine.Server
             p.Kills = Store.ParseInt(Get(d, "kills", "0"));
             p.Feedings = Store.ParseInt(Get(d, "feedings", "0"));
             p.Missions = Store.ParseInt(Get(d, "missions", "0"));
+            p.Gifts = Store.ParseInt(Get(d, "gifts", "1")) | 1;
             return p;
         }
 

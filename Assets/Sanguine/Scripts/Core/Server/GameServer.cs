@@ -214,7 +214,7 @@ namespace Sanguine.Server
                 case Msg.FeedStart: StartFeeding(p, r.Int()); break;
                 case Msg.FeedStop: StopFeeding(p, true); break;
                 case Msg.Attack: Attack(p, r.Int()); break;
-                case Msg.Power: UsePower(p, r.Int()); break;
+                case Msg.Power: UsePower(p, r.Byte(), r.Int()); break;
                 case Msg.Chat: HandleChat(p, (ChatChannel)r.Byte(), r.Str(240)); break;
                 default: break;
             }
@@ -293,7 +293,9 @@ namespace Sanguine.Server
             if (isNew)
             {
                 Notice(p, NoticeLevel.Info, "Welcome to Sanguine City, " + def.Name + ". Hunt, but keep the Hush.");
-                SystemMsg(p, "You are of the " + def.Name + ", " + def.Epithet + ". Your gift: " + def.PowerName + " - " + def.PowerDescription);
+                SystemMsg(p, "You are of the " + def.Name + ", " + def.Epithet + ". Your gift: " + def.Gifts[0].Name + " - " + def.Gifts[0].Description);
+                SystemMsg(p, "Two more gifts can be learned with standing: " + def.Gifts[1].Name + " (" + def.Gifts[1].StandingCost + ") and " +
+                             def.Gifts[2].Name + " (" + def.Gifts[2].StandingCost + "). See /gifts.");
                 SystemMsg(p, "Type /help for commands. Feed (F) on mortals away from witnesses. Return to your haven before dawn.");
             }
             else Notice(p, NoticeLevel.Info, "You rise again, " + prof.Name + ".");
@@ -336,6 +338,7 @@ namespace Sanguine.Server
         {
             float m = 1f;
             if (_now < p.SurgeUntil) m *= GameRules.SurgeSpeedMultiplier;
+            if (_now < p.MistUntil) m *= 1.3f;
             if (_now < p.SlowUntil) m *= GameRules.SlowSpeedMultiplier;
             return m;
         }
@@ -424,6 +427,9 @@ namespace Sanguine.Server
                 if (_now < p.SurgeUntil) f |= EntityFlags.Surging;
                 if (_now < p.RootUntil) f |= EntityFlags.Stunned;
                 if (IsRegent(p)) f |= EntityFlags.Regent;
+                if (_now < p.MistUntil) f |= EntityFlags.Mist;
+                if (_now < p.IronSkinUntil) f |= EntityFlags.IronSkin;
+                if (_now < p.MajestyUntil) f |= EntityFlags.Majesty;
             }
             var m = e as Mortal;
             if (m != null)
@@ -442,7 +448,6 @@ namespace Sanguine.Server
             {
                 Blood = p.Blood, MaxBlood = p.MaxBlood, Health = p.Health, MaxHealth = p.MaxHealth,
                 Conscience = p.Conscience, Exposure = p.Exposure, Standing = p.Standing,
-                PowerCooldown = (float)Math.Max(0, p.PowerReadyAt - _now),
                 AttackCooldown = (float)Math.Max(0, p.AttackReadyAt - _now),
                 FeedTarget = p.FeedTarget, District = (byte)GameData.DistrictAt(p.X, p.Z)
             };
@@ -462,7 +467,14 @@ namespace Sanguine.Server
             if (p.Conscience <= GameRules.ConscienceBeastThreshold) f |= SelfFlags.Beast;
             if (p.Blood <= 0f) f |= SelfFlags.Starving;
             if (IsRegent(p)) f |= SelfFlags.Regent;
+            if (_now < p.IronSkinUntil) f |= SelfFlags.IronSkin;
+            if (_now < p.GlamourUntil) f |= SelfFlags.Glamour;
+            if (_now < p.MistUntil) f |= SelfFlags.Mist;
+            if (_now < p.MajestyUntil) f |= SelfFlags.Majesty;
+            if (_now < p.SilencedUntil) f |= SelfFlags.Silenced;
             m.Flags = f;
+            m.LearnedGifts = (byte)(p.Profile.Gifts | 1);
+            for (int i = 0; i < GameRules.GiftSlots; i++) m.GiftCooldowns[i] = (float)Math.Max(0, p.GiftReadyAt[i] - _now);
             for (int i = 0; i < p.Thralls.Length; i++)
             {
                 m.Thralls[i] = new ThrallInfo

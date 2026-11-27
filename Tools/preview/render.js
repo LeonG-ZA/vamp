@@ -366,7 +366,14 @@ el(`<b>Districts</b><br>${dn.map((n, i) => `${i + 1}. ${n}: ${w.controllers[i] ?
 if (tgt) { el(`<div style="text-align:center;margin-top:3px"><b>${tgt.name}</b> (Mortal) ${Math.hypot(tgt.x - me.x, tgt.z - me.z).toFixed(1)}m</div>`, `left:${W / 2 - 160}px;top:80px;width:320px;height:54px;background:rgba(0,0,0,.5)`); bar(W / 2 - 150, 108, 300, 16, tgt.hp, 255, 'rgb(179,26,26)', ''); }
 const levelColor = n => /MARKED|hunter/i.test(n) ? 'rgb(255,77,77)' : 'rgb(242,242,242)';
 S.notices.slice(-3).forEach((n, i) => el(n, `left:0;top:${H * 0.28 + i * 26}px;width:${W}px;text-align:center;font:bold 18px Arial;color:${levelColor(n)};text-shadow:1px 1px 0 #000`));
-['[F] Release', '[1] Strike', '[2] Allure<br><span style="font-size:10px">1 blood</span>', '[T] Thralls', '[H] Help'].forEach((b, i) => el(`<div class="btn">${b}</div>`, `left:${W / 2 - 312 + i * 126}px;top:${H - 58}px;width:120px;height:48px`));
+// Action bar (ClientUI.DrawActionBar): feed, strike, the bloodline's three gifts, gifts panel, thralls, help.
+const GIFTS = [[['Surge', 2, 0], ['Iron Skin', 2, 5], ['Earthshaker', 3, 12]], [['Allure', 1, 0], ['Glamour', 2, 5], ['Rapture', 3, 12]],
+               [['Blood Lash', 2, 0], ['Siphon', 1, 5], ['Crimson Mist', 3, 12]], [['Command', 2, 0], ['Majesty', 2, 5], ['Dominate', 3, 12]]][me.bloodline];
+const learned = S.self.gifts || 1;
+const bar8 = ['[F] Release', '[1] Strike',
+  ...GIFTS.map((g, i) => `[${i + 2}] ${g[0]}<br><span style="font-size:10px">${(learned >> i) & 1 ? g[1] + ' blood' : '<span style="color:#ff9060">locked: ' + g[2] + ' standing</span>'}</span>`),
+  '[G] Gifts', '[T] Thralls', '[H] Help'];
+bar8.forEach((b, i) => el(`<div class="btn">${b}</div>`, `left:${W / 2 - (112 * 8 + 6 * 7) / 2 + i * 118}px;top:${H - 58}px;width:112px;height:48px`));
 el('', `left:10px;top:${H - 300}px;width:460px;height:220px;background:rgba(0,0,0,.35)`);
 el(S.chat.slice(-11).map(c => { const m = c.match(/^([A-Za-z0-9_]+): (.*)$/); return m ? `<span style="color:#e0e0e0"><b>${m[1]}</b>: ${m[2]}</span>` : `<span style="color:#c0a0ff">${c.replace(/</g, '&lt;')}</span>`; }).join('<br>'), `left:16px;top:${H - 296}px;width:448px;font-size:12px;line-height:16px`);
 el('<span style="color:#999">Press Enter to chat. /help for commands.</span>', `left:10px;top:${H - 76}px;font-size:12px`);

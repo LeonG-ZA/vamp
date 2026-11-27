@@ -34,7 +34,7 @@ namespace Sanguine
     public enum NoticeLevel : byte { Info = 0, Good = 1, Warning = 2, Danger = 3 }
 
     [Flags]
-    public enum EntityFlags : byte
+    public enum EntityFlags : ushort
     {
         None = 0,
         Down = 1,       // torpor (players) or dead (NPCs)
@@ -45,6 +45,9 @@ namespace Sanguine
         Stunned = 32,
         Surging = 64,
         Regent = 128,
+        Mist = 256,     // Crimson Mist: shown as swirling red mist
+        IronSkin = 512,
+        Majesty = 1024,
     }
 
     [Flags]
@@ -65,6 +68,11 @@ namespace Sanguine
         Beast = 1 << 11,
         Starving = 1 << 12,
         Regent = 1 << 13,
+        IronSkin = 1 << 14,
+        Glamour = 1 << 15,
+        Mist = 1 << 16,
+        Majesty = 1 << 17,
+        Silenced = 1 << 18,
     }
 
     public enum ThrallState : byte { Idle = 0, OnMission = 1, Recovering = 2 }
@@ -83,6 +91,7 @@ namespace Sanguine
         public PacketWriter Byte(byte v) { _w.Write(v); return this; }
         public PacketWriter Bool(bool v) { _w.Write(v); return this; }
         public PacketWriter Int(int v) { _w.Write(v); return this; }
+        public PacketWriter UShort(ushort v) { _w.Write(v); return this; }
         public PacketWriter Float(float v) { _w.Write(v); return this; }
         public PacketWriter Str(string v) { _w.Write(v ?? string.Empty); return this; }
 
@@ -103,6 +112,7 @@ namespace Sanguine
         public byte Byte() { return _r.ReadByte(); }
         public bool Bool() { return _r.ReadBoolean(); }
         public int Int() { return _r.ReadInt32(); }
+        public ushort UShort() { return _r.ReadUInt16(); }
         public float Float()
         {
             float f = _r.ReadSingle();
@@ -180,7 +190,7 @@ namespace Sanguine
             for (int i = 0; i < states.Count; i++)
             {
                 EntityState s = states[i];
-                w.Int(s.Id).Byte((byte)s.Kind).Float(s.X).Float(s.Z).Float(s.Rot).Byte(s.HealthPct).Byte((byte)s.Flags);
+                w.Int(s.Id).Byte((byte)s.Kind).Float(s.X).Float(s.Z).Float(s.Rot).Byte(s.HealthPct).UShort((ushort)s.Flags);
             }
             return w.ToArray();
         }
@@ -196,7 +206,7 @@ namespace Sanguine
                 into.Add(new EntityState
                 {
                     Id = r.Int(), Kind = (EntityKind)r.Byte(), X = r.Float(), Z = r.Float(), Rot = r.Float(),
-                    HealthPct = r.Byte(), Flags = (EntityFlags)r.Byte()
+                    HealthPct = r.Byte(), Flags = (EntityFlags)r.UShort()
                 });
             }
             return t;
@@ -234,7 +244,11 @@ namespace Sanguine
         public float Blood, MaxBlood, Health, MaxHealth, Conscience, Exposure;
         public int Standing;
         public SelfFlags Flags;
-        public float PowerCooldown, AttackCooldown;
+        public float AttackCooldown;
+        /// <summary>Remaining cooldown of each gift slot.</summary>
+        public float[] GiftCooldowns = new float[GameRules.GiftSlots];
+        /// <summary>Bit mask of learned gift slots (bit 0, the innate gift, is always set).</summary>
+        public byte LearnedGifts = 1;
         public int FeedTarget;
         public byte District;
         public ThrallInfo[] Thralls = new ThrallInfo[GameRules.ThrallsPerPlayer];
@@ -243,8 +257,9 @@ namespace Sanguine
         {
             var w = new PacketWriter(Msg.SelfState)
                 .Float(Blood).Float(MaxBlood).Float(Health).Float(MaxHealth).Float(Conscience).Float(Exposure)
-                .Int(Standing).Int((int)Flags).Float(PowerCooldown).Float(AttackCooldown).Int(FeedTarget).Byte(District)
-                .Byte((byte)Thralls.Length);
+                .Int(Standing).Int((int)Flags).Float(AttackCooldown).Int(FeedTarget).Byte(District).Byte(LearnedGifts);
+            for (int i = 0; i < GiftCooldowns.Length; i++) w.Float(GiftCooldowns[i]);
+            w.Byte((byte)Thralls.Length);
             for (int i = 0; i < Thralls.Length; i++)
                 w.Byte((byte)Thralls[i].State).Byte(Thralls[i].District).Float(Thralls[i].Remaining);
             return w.ToArray();
@@ -256,8 +271,9 @@ namespace Sanguine
             {
                 Blood = r.Float(), MaxBlood = r.Float(), Health = r.Float(), MaxHealth = r.Float(),
                 Conscience = r.Float(), Exposure = r.Float(), Standing = r.Int(), Flags = (SelfFlags)r.Int(),
-                PowerCooldown = r.Float(), AttackCooldown = r.Float(), FeedTarget = r.Int(), District = r.Byte()
+                AttackCooldown = r.Float(), FeedTarget = r.Int(), District = r.Byte(), LearnedGifts = r.Byte()
             };
+            for (int i = 0; i < m.GiftCooldowns.Length; i++) m.GiftCooldowns[i] = r.Float();
             int n = r.Byte();
             m.Thralls = new ThrallInfo[n];
             for (int i = 0; i < n; i++)
@@ -312,7 +328,7 @@ namespace Sanguine
         public static byte[] FeedStart(int target) { return new PacketWriter(Msg.FeedStart).Int(target).ToArray(); }
         public static byte[] FeedStop() { return new PacketWriter(Msg.FeedStop).ToArray(); }
         public static byte[] Attack(int target) { return new PacketWriter(Msg.Attack).Int(target).ToArray(); }
-        public static byte[] Power(int target) { return new PacketWriter(Msg.Power).Int(target).ToArray(); }
+        public static byte[] Power(int slot, int target) { return new PacketWriter(Msg.Power).Byte((byte)slot).Int(target).ToArray(); }
         public static byte[] Chat(ChatChannel ch, string text) { return new PacketWriter(Msg.Chat).Byte((byte)ch).Str(text).ToArray(); }
 
         public static byte[] LoginFailed(string reason) { return new PacketWriter(Msg.LoginFailed).Str(reason).ToArray(); }

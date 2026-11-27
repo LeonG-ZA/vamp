@@ -32,14 +32,40 @@ cancelled *World of Darkness* MMO (see `RESEARCH.md`): a **politics-first sandbo
 - **Havens** (one per bloodline): no PvP, no sun damage, the respawn point.
 - **Sanctums** (*The Gilded Opera*, *Chapel of Saint Veran*): neutral ground. No violence, no feeding, sheltered from the sun.
 
-## 4. Bloodlines
+## 4. Bloodlines and gifts
 
-| Bloodline | Epithet | Gift | Blood/Health/Melee | Favoured |
-|---|---|---|---|---|
-| **Vorlen** | the Iron Kin | *Surge*: +60% speed and 2× melee for 6 s (2 blood, 15 s cd) | 10 / 13 / 2 | Harbor |
-| **Sylphine** | the Velvet Choir | *Allure* (12 m): a mortal follows you entranced; a rival is slowed 4 s; a hunter is stunned 3 s (1 blood, 10 s cd) | 11 / 10 / 1 | Midtown |
-| **Ashborn** | the Grave Choir | *Blood Lash*: 3 damage at 15 m (2 blood, 6 s cd) | 12 / 9 / 1 | Old Quarter |
-| **Aurum** | the Gilded Court | *Command* (9 m): a mortal forgets (−15 exposure, never raises it); a rival is rooted 2 s; a hunter is stunned 4 s (2 blood, 12 s cd) | 10 / 11 / 1 | Financial Row |
+| Bloodline | Epithet | Blood/Health/Melee | Favoured |
+|---|---|---|---|
+| **Vorlen** | the Iron Kin | 10 / 13 / 2 | Harbor |
+| **Sylphine** | the Velvet Choir | 11 / 10 / 1 | Midtown |
+| **Ashborn** | the Grave Choir | 12 / 9 / 1 | Old Quarter |
+| **Aurum** | the Gilded Court | 10 / 11 / 1 | Financial Row |
+
+Each bloodline has **three gifts**, on keys 2, 3 and 4.
+- The first is innate.
+- The second costs **5 standing** to learn and the third **12** (`/learn`, or the Gifts panel on G). Tiers are learned in order.
+- Standing spent is gone. Standing also weights your Regent vote, so every new gift is a political sacrifice.
+- **Subtle** gifts don't breach the Hush when mortals see them. Every other gift adds exposure for each witness (8 each, max 25).
+
+| Gift | Tier | Blood / cooldown | Effect |
+|---|---|---|---|
+| **Surge** (Vorlen) | 1 | 2 / 15 s | +60% speed and double melee damage for 6 s |
+| **Iron Skin** (Vorlen) | 2 | 2 / 25 s | 8 s: half damage taken, immune to roots, slows and stuns |
+| **Earthshaker** (Vorlen) | 3 | 3 / 30 s | 3 damage and a 1.5 s stun to rivals and hunters within 6 m; mortals flee |
+| **Allure** (Sylphine) | 1 | 1 / 10 s, 12 m | Mortal follows you entranced; rival slowed 4 s; hunter stunned 3 s |
+| **Glamour** (Sylphine) | 2 | 2 / 30 s, subtle | 10 s with no exposure from witnesses; the Beast frightens no one |
+| **Rapture** (Sylphine) | 3 | 3 / 40 s | All mortals within 15 m enthralled (so they don't witness), hunters stunned 3 s, rivals within 10 m slowed |
+| **Blood Lash** (Ashborn) | 1 | 2 / 6 s, 15 m | 3 damage at range |
+| **Siphon** (Ashborn) | 2 | 1 / 14 s, 10 m | Draw up to 2 blood from a target; drained mortals die (conscience loss) |
+| **Crimson Mist** (Ashborn) | 3 | 3 / 45 s | 4 s as mist: untouchable, 30% faster, can't feed or strike; pursuing hunters lose the trail |
+| **Command** (Aurum) | 1 | 2 / 12 s, 9 m, subtle | Mortal forgets (−15 exposure); rival rooted 2 s; hunter stunned 4 s |
+| **Majesty** (Aurum) | 2 | 2 / 30 s, subtle | 8 s: rivals cannot bring themselves to strike you; hunters keep 6 m away |
+| **Dominate** (Aurum) | 3 | 3 / 40 s, 9 m, subtle | Hunter abandons the hunt; rival rooted 3 s and **silenced** (no gifts) 6 s; mortal makes all witnesses within 10 m forget (−30 exposure) |
+
+Interactions:
+- Iron Skin blocks roots, slows and stuns, but not silence.
+- Crimson Mist can't be targeted.
+- Area gifts spare your circle, anyone in a haven or sanctum, and anyone in mist. They can't be used inside a sanctum.
 
 ## 5. Core systems
 
@@ -129,7 +155,7 @@ Circle chat is `/c`. A circle dissolves when its last member leaves.
 
 - Lag compensation; move to UDP (e.g. Unity Transport) for scale.
 - Sire/childe lineage (the Embrace as a player action), with brood-style ties.
-- More gifts per bloodline, unlocked by spending standing; animated character models.
+- Animated character models.
 - Hunting-ground ownership inside districts; NPC informants; police and media reacting to exposure.
 - Database persistence (PostgreSQL), account service, server sharding by city.
 - Mobile and WebGL clients over WebSockets.
