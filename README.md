@@ -133,13 +133,13 @@ Chat commands: `/help /who /stats /districts /gifts /learn /say /c /lin /city /c
 
 [GitHub Releases](https://github.com/LeonG-ZA/vamp/releases) carry the dedicated server for Linux and Windows as single self-contained executables (no .NET install needed). Play the client from the source in Unity.
 
-To make a release, write the notes in `Docs/releases/<tag>.md`, then push a version tag:
+To make a release, write the notes in `Docs/releases/<tag>.md`. Then either open **Actions ▸ Release ▸ Run workflow** and enter the tag (for example `v0.2.0`), or push one:
 
 ```bash
 git tag -a v0.2.0 -m "Sanguine City 0.2.0" && git push origin v0.2.0
 ```
 
-`.github/workflows/release.yml` then runs the integration test, builds the servers and publishes the release. `v0.x` tags are published as pre-releases.
+`.github/workflows/release.yml` then runs the integration test, builds the servers and publishes the release. A run started from the Actions tab creates the tag on the branch's latest commit. `v0.x` tags are published as pre-releases.
 
 ## Dedicated server without Unity
 
